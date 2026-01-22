@@ -4,12 +4,14 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggingInterceptor } from './libs/interceptor/Logging.interceptor';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
 	const logger = new Logger('Bootstrap');
 
 	try {
-		const app = await NestFactory.create(AppModule, {
+		const app = await NestFactory.create<NestExpressApplication>(AppModule, {
 			logger: ['error', 'warn', 'log', 'debug', 'verbose'],
 		});
 
@@ -39,6 +41,12 @@ async function bootstrap() {
 		});
 
 		const configService = app.get(ConfigService);
+		const uploadConfig = configService.get<any>('upload');
+		if (uploadConfig?.localPath) {
+			app.useStaticAssets(join(process.cwd(), uploadConfig.localPath), {
+				prefix: `/${uploadConfig.localPath}`,
+			});
+		}
 		const port = configService.get<number>('app.port') || parseInt(process.env.PORT_API || '3000', 10);
 
 		await app.listen(port);
