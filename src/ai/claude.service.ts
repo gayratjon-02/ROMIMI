@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
+import type { Messages } from '@anthropic-ai/sdk/resources';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { AIMessage, FileMessage } from '../libs/enums';
-import { Messages } from '@anthropic-ai/sdk/resources.js';
 
 type AnalyzeProductInput = {
 	images: string[];
@@ -44,14 +44,9 @@ export class ClaudeService {
 
 	private client: Anthropic | null = null;
 
-	// Eng xavfsiz variant: har doim eng so‘nggi Sonnet’ga yo‘naltiradi
 	private readonly model = 'claude-sonnet-4-20250514';
 
 	constructor(private readonly configService: ConfigService) {}
-
-	/* -------------------------------------------------------------------------- */
-	/*                               PUBLIC METHODS                               */
-	/* -------------------------------------------------------------------------- */
 
 	async analyzeProduct(input: AnalyzeProductInput): Promise<Record<string, any>> {
 		if (!input.images?.length) {
@@ -77,7 +72,9 @@ export class ClaudeService {
 	async generatePrompts(input: GeneratePromptsInput): Promise<string[]> {
 		const count = input.count && input.count > 0 ? input.count : 6;
 
-		const content: ClaudeContentBlock[] = [{ type: 'text', text: this.buildPromptGenerationPrompt(input, count) }];
+		const content: ClaudeContentBlock[] = [
+			{ type: 'text', text: this.buildPromptGenerationPrompt(input, count) },
+		];
 
 		const response = await this.createMessage({
 			content,
@@ -119,10 +116,6 @@ export class ClaudeService {
 		return parsed || { raw: text };
 	}
 
-	/* -------------------------------------------------------------------------- */
-	/*                              CLAUDE CLIENT HELPERS                         */
-	/* -------------------------------------------------------------------------- */
-
 	private getClient(): Anthropic {
 		if (this.client) {
 			return this.client;
@@ -157,7 +150,6 @@ export class ClaudeService {
 
 			return res;
 		} catch (error: any) {
-			// *** MUHIM QISM: bu yerda haqiqiy Claude xatosini ko‘ramiz ***
 			this.logger.error('Claude API error', {
 				message: error?.message,
 				name: error?.name,
@@ -165,16 +157,9 @@ export class ClaudeService {
 				data: error?.response?.data,
 			});
 
-			// Clientga ham aniqroq xabar yuborish
-			const details = error?.response?.data?.error?.message ?? error?.message ?? 'Unknown error';
-
-			throw new InternalServerErrorException(`${AIMessage.CLAUDE_API_ERROR}: ${details}`);
+			throw new InternalServerErrorException(AIMessage.CLAUDE_API_ERROR);
 		}
 	}
-
-	/* -------------------------------------------------------------------------- */
-	/*                                PROMPT BUILDERS                             */
-	/* -------------------------------------------------------------------------- */
 
 	private buildProductAnalysisPrompt(input: AnalyzeProductInput): string {
 		const lines = [
@@ -246,10 +231,6 @@ export class ClaudeService {
 
 		return lines.join('\n');
 	}
-
-	/* -------------------------------------------------------------------------- */
-	/*                               IMAGE HELPERS                                */
-	/* -------------------------------------------------------------------------- */
 
 	private async buildImageBlocks(images: string[]): Promise<ClaudeContentBlock[]> {
 		const blocks: ClaudeContentBlock[] = [];
@@ -367,10 +348,6 @@ export class ClaudeService {
 				return 'image/jpeg';
 		}
 	}
-
-	/* -------------------------------------------------------------------------- */
-	/*                             RESPONSE PARSING HELPERS                        */
-	/* -------------------------------------------------------------------------- */
 
 	private extractText(content: Array<{ type: string; text?: string }>): string {
 		return content
