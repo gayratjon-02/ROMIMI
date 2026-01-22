@@ -20,3 +20,8 @@ export * from './update-prompt-templates.dto';
 export * from './create-product.dto';
 export * from './update-product.dto';
 export * from './upload-product.dto';
+
+// Generations DTOs
+export * from './create-generation.dto';
+export * from './update-generation.dto';
+export * from './generate.dto';

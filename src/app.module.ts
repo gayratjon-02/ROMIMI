@@ -14,6 +14,7 @@ import { CollectionsModule } from './collections/collections.module';
 import { FilesModule } from './files/files.module';
 import { ProductsModule } from './products/products.module';
 import { AiModule } from './ai/ai.module';
+import { GenerationsModule } from './generations/generations.module';
 
 @Module({
 	imports: [
@@ -30,6 +31,7 @@ import { AiModule } from './ai/ai.module';
 		FilesModule,
 		ProductsModule,
 		AiModule,
+		GenerationsModule,
 	],
 	controllers: [],
 	providers: [],
