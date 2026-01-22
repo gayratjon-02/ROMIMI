@@ -2,8 +2,6 @@ import {
 	Controller,
 	Get,
 	Post,
-	Put,
-	Delete,
 	Body,
 	Param,
 	UseGuards,
@@ -28,7 +26,7 @@ export class ProductsController {
 		private readonly filesService: FilesService,
 	) {}
 
-	@Post()
+	@Post('createProduct')
 	@UseInterceptors(
 		FileFieldsInterceptor([
 			{ name: 'front_image', maxCount: 1 },
@@ -67,8 +65,8 @@ export class ProductsController {
 		return this.productsService.create(user.id, createProductDto);
 	}
 
-	@Get()
-	async getAll(
+	@Get('getAllProducts')
+	async getAllProducts(
 		@CurrentUser() user: User,
 		@Query('collection_id') collectionId?: string,
 		@Query('page') page?: string,
@@ -81,16 +79,16 @@ export class ProductsController {
 		});
 	}
 
-	@Get(':id')
-	async getOne(
+	@Get('getProduct/:id')
+	async getProduct(
 		@Param('id') id: string,
 		@CurrentUser() user: User,
 	): Promise<Product> {
 		return this.productsService.findOne(id, user.id);
 	}
 
-	@Put(':id')
-	async update(
+	@Post('updateProduct/:id')
+	async updateProduct(
 		@Param('id') id: string,
 		@CurrentUser() user: User,
 		@Body() updateProductDto: UpdateProductDto,
@@ -98,8 +96,8 @@ export class ProductsController {
 		return this.productsService.update(id, user.id, updateProductDto);
 	}
 
-	@Delete(':id')
-	async remove(
+	@Post('deleteProduct/:id')
+	async deleteProduct(
 		@Param('id') id: string,
 		@CurrentUser() user: User,
 	): Promise<{ message: string }> {

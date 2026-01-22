@@ -47,6 +47,6 @@ import { FileMessage } from '../libs/enums';
 	],
 	controllers: [FilesController],
 	providers: [FilesService],
-	exports: [FilesService],
+	exports: [FilesService, MulterModule],
 })
 export class FilesModule {}
