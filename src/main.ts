@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { LoggingInterceptor } from './libs/interceptor/Logging.interceptor';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { HttpExceptionFilter } from './common/filters';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
@@ -49,6 +50,46 @@ async function bootstrap() {
 		// API prefix
 		app.setGlobalPrefix('api');
 
+		// Swagger/OpenAPI Documentation
+		const config = new DocumentBuilder()
+			.setTitle('ROMIMI Visual Generator API')
+			.setDescription('Complete API documentation for ROMIMI Visual Generator - AI-powered e-commerce visual generation platform')
+			.setVersion('1.0')
+			.setContact('ROMIMI Team', 'https://romimi.com', 'support@romimi.com')
+			.addBearerAuth(
+				{
+					type: 'http',
+					scheme: 'bearer',
+					bearerFormat: 'JWT',
+					name: 'JWT',
+					description: 'Enter JWT token',
+					in: 'header',
+				},
+				'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+			)
+			.addTag('Authentication', 'User authentication and registration')
+			.addTag('Users', 'User profile management')
+			.addTag('Brands', 'Brand management for e-commerce')
+			.addTag('Collections', 'Product collection management')
+			.addTag('Products', 'Product management and analysis')
+			.addTag('Generations', 'AI image generation workflow')
+			.addTag('Ad Recreation', 'Competitor ad analysis and recreation')
+			.addTag('Files', 'File upload and management')
+			.build();
+
+		const document = SwaggerModule.createDocument(app, config);
+		SwaggerModule.setup('api/docs', app, document, {
+			customSiteTitle: 'ROMIMI API Documentation',
+			customCss: `
+				.topbar-wrapper { display: none }
+				.swagger-ui .info { margin: 20px 0 }
+				.swagger-ui .scheme-container { margin: 20px 0; padding: 20px; background-color: #f8f9fa; border-radius: 4px; }
+			`,
+			swaggerOptions: {
+				persistAuthorization: true,
+			},
+		});
+
 		app.enableCors({
 			origin: process.env.FRONTEND_URL || '*',
 			credentials: true,
@@ -67,6 +108,7 @@ async function bootstrap() {
 
 		logger.log(`🚀 Application is running on: http://localhost:${port}`);
 		logger.log(`📝 API endpoints available at: http://localhost:${port}/api`);
+		logger.log(`📚 API documentation available at: http://localhost:${port}/api/docs`);
 	} catch (error) {
 		logger.error(' Failed to start application', error);
 		process.exit(1);
