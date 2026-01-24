@@ -17,6 +17,9 @@ import { FilesModule } from './files/files.module';
 import { ProductsModule } from './products/products.module';
 import { AiModule } from './ai/ai.module';
 import { GenerationsModule } from './generations/generations.module';
+import { AdRecreationModule } from './ad-recreation/ad-recreation.module';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
 	imports: [
@@ -44,8 +47,14 @@ import { GenerationsModule } from './generations/generations.module';
 		ProductsModule,
 		AiModule,
 		GenerationsModule,
+		AdRecreationModule,
 	],
 	controllers: [],
-	providers: [],
+	providers: [
+		{
+			provide: APP_GUARD,
+			useClass: JwtAuthGuard,
+		},
+	],
 })
 export class AppModule {}

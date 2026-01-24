@@ -8,6 +8,7 @@ import { Brand } from './entities/brand.entity';
 import { Collection } from './entities/collection.entity';
 import { Product } from './entities/product.entity';
 import { Generation } from './entities/generation.entity';
+import { AdRecreation } from './entities/ad-recreation.entity';
 
 @Module({
     imports: [
@@ -27,7 +28,7 @@ import { Generation } from './entities/generation.entity';
 
                 return {
                     ...dbConfig,
-                    entities: [User, Brand, Collection, Product, Generation],
+					entities: [User, Brand, Collection, Product, Generation, AdRecreation],
                     autoLoadEntities: false,
                     maxQueryExecutionTime: 10000,
                     extra: {
@@ -37,7 +38,7 @@ import { Generation } from './entities/generation.entity';
             },
         }),
 
-        TypeOrmModule.forFeature([User, Brand, Collection, Product, Generation]),
+		TypeOrmModule.forFeature([User, Brand, Collection, Product, Generation, AdRecreation]),
     ],
     exports: [TypeOrmModule],
 })

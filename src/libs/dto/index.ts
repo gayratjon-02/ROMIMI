@@ -26,3 +26,8 @@ export * from './analyze-images.dto';
 export * from './create-generation.dto';
 export * from './update-generation.dto';
 export * from './generate.dto';
+
+// Ad Recreation DTOs
+export * from './create-ad-recreation.dto';
+export * from './analyze-ad.dto';
+export * from './generate-variations.dto';
