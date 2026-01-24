@@ -4,6 +4,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggingInterceptor } from './libs/interceptor/Logging.interceptor';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { HttpExceptionFilter } from './common/filters';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
@@ -15,12 +16,27 @@ async function bootstrap() {
 			logger: ['error', 'warn', 'log', 'debug', 'verbose'],
 		});
 
-		// Global validation pipe
+		// Global exception filter
+		app.useGlobalFilters(new HttpExceptionFilter());
+
+		// Enhanced global validation pipe
 		app.useGlobalPipes(
 			new ValidationPipe({
 				whitelist: true, // Remove unknown properties
 				forbidNonWhitelisted: true, // Throw error if unknown properties exist
 				transform: true, // Transform payloads to DTO instances
+				transformOptions: {
+					enableImplicitConversion: true, // Auto-convert types
+				},
+				disableErrorMessages: false, // Show detailed error messages
+				validationError: {
+					target: false, // Don't include target object in error
+					value: false, // Don't include value in error
+				},
+				exceptionFactory: (errors) => {
+					// Custom error formatting will be handled by HttpExceptionFilter
+					return new ValidationPipe().createExceptionFactory()(errors);
+				},
 			}),
 		);
 

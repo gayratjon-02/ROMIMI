@@ -31,3 +31,6 @@ export * from './generate.dto';
 export * from './create-ad-recreation.dto';
 export * from './analyze-ad.dto';
 export * from './generate-variations.dto';
+
+// File Upload DTOs
+export * from './upload-file.dto';
