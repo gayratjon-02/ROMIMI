@@ -63,3 +63,5 @@ uploads/
 
 ./DEVELOPMENT_ROADMAP.md
 ./.DEVELOPMENT_ROADMAP.md
+# Ignore uploads folder
+uploads/
