@@ -7,15 +7,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import archiver from 'archiver';
 
 import { Generation } from '../database/entities/generation.entity';
 import { Product } from '../database/entities/product.entity';
 import { Collection } from '../database/entities/collection.entity';
-import { GeminiService } from '../ai/gemini.service';
 
 import { CreateGenerationDto, GenerateDto, UpdateGenerationDto } from '../libs/dto';
 import { ErrorMessage, GenerationMessage, GenerationStatus, NotFoundMessage, PermissionMessage } from '../libs/enums';
+import { GenerationJobData } from './generation.processor';
 
 type GenerationFilters = {
 	product_id?: string;
@@ -38,7 +40,8 @@ export class GenerationsService {
 		@InjectRepository(Collection)
 		private readonly collectionsRepository: Repository<Collection>,
 
-		private readonly geminiService: GeminiService,
+		@InjectQueue('generation')
+		private readonly generationQueue: Queue<GenerationJobData>,
 	) {}
 
 	async create(userId: string, dto: CreateGenerationDto): Promise<Generation> {
@@ -167,55 +170,144 @@ export class GenerationsService {
 			throw new BadRequestException(GenerationMessage.NO_VISUALS_FOUND);
 		}
 
+		// Add job to queue instead of processing synchronously
+		const job = await this.generationQueue.add(
+			{
+				generationId: id,
+				prompts,
+				model: dto.model,
+			},
+			{
+				jobId: `generation-${id}`,
+				removeOnComplete: false,
+				removeOnFail: false,
+			},
+		);
+
+		// Update generation status to processing
 		generation.status = GenerationStatus.PROCESSING;
+		generation.completed_at = null;
 		await this.generationsRepository.save(generation);
 
-		try {
-			const results = await this.geminiService.generateBatch(prompts, dto.model);
+		// Return generation with job info
+		return {
+			...generation,
+			job_id: job.id.toString(),
+		} as Generation & { job_id: string };
+	}
 
-			generation.visuals = results.map((result, index) => ({
-				prompt: prompts[index],
-				mimeType: result.mimeType,
-				data: result.data,
-				text: result.text,
-				generated_at: new Date().toISOString(),
-			}));
+	async getGenerationProgress(id: string, userId: string): Promise<{
+		status: string;
+		progress: number;
+		completed: number;
+		total: number;
+		visuals: Array<{ index: number; status: string; error?: string }>;
+	}> {
+		const generation = await this.findOne(id, userId);
 
-			generation.status = GenerationStatus.COMPLETED;
-			generation.completed_at = new Date();
+		const visuals = generation.visuals || [];
+		const completed = visuals.filter((v: any) => v.status === 'completed').length;
+		const failed = visuals.filter((v: any) => v.status === 'failed').length;
+		const total = visuals.length || 0;
+		const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-			return await this.generationsRepository.save(generation);
-		} catch (error) {
-			generation.status = GenerationStatus.FAILED;
-			await this.generationsRepository.save(generation);
-
-			throw new InternalServerErrorException(GenerationMessage.GENERATION_FAILED);
-		}
+		return {
+			status: generation.status,
+			progress,
+			completed,
+			total,
+			visuals: visuals.map((v: any, index: number) => ({
+				index: v.index ?? index,
+				status: v.status || 'pending',
+				error: v.error,
+			})),
+		};
 	}
 
 	async createDownloadArchive(id: string, userId: string): Promise<{ archive: archiver.Archiver; filename: string }> {
 		const generation = await this.findOne(id, userId);
-		const items = this.extractGeneratedImages(generation.visuals || []);
+		const visuals = generation.visuals || [];
 
-		if (!items.length) {
+		if (!visuals.length) {
 			throw new BadRequestException(GenerationMessage.NO_VISUALS_FOUND);
 		}
 
+		// Get product and collection for folder structure
+		const product = await this.productsRepository.findOne({
+			where: { id: generation.product_id },
+			relations: ['collection'],
+		});
+
+		const collection = product?.collection;
+
 		const archive = archiver('zip', { zlib: { level: 9 } });
 
-		items.forEach((item, index) => {
-			const ext = this.extensionFromMime(item.mimeType);
-			const buffer = Buffer.from(item.data, 'base64');
+		// Create folder structure: Collection/Product/visuals
+		const collectionName = collection?.name || 'Unknown';
+		const productName = product?.name || 'Unknown';
+		const sanitizedCollectionName = this.sanitizeFileName(collectionName);
+		const sanitizedProductName = this.sanitizeFileName(productName);
 
-			archive.append(buffer, { name: `image-${index + 1}.${ext}` });
+		visuals.forEach((visual: any, index: number) => {
+			if (!visual || visual.status !== 'completed') {
+				return; // Skip failed or pending visuals
+			}
+
+			let buffer: Buffer;
+			let ext: string;
+			let fileName: string;
+
+			// Handle different data formats
+			if (visual.data) {
+				// Base64 data
+				buffer = Buffer.from(visual.data, 'base64');
+				ext = this.extensionFromMime(visual.mimeType || 'image/png');
+			} else if (visual.image_url) {
+				// Data URL
+				const dataUrlMatch = visual.image_url.match(/^data:([^;]+);base64,(.+)$/);
+				if (dataUrlMatch) {
+					buffer = Buffer.from(dataUrlMatch[2], 'base64');
+					ext = this.extensionFromMime(dataUrlMatch[1]);
+				} else {
+					// Skip if not base64
+					return;
+				}
+			} else {
+				// Skip if no data
+				return;
+			}
+
+			// Generate filename based on visual type
+			const visualType = visual.type || `visual_${index + 1}`;
+			const visualTypeMap: Record<string, string> = {
+				duo: 'duo',
+				solo: 'solo',
+				flatlay_front: 'flatlay_front',
+				flatlay_back: 'flatlay_back',
+				closeup_front: 'closeup_front',
+				closeup_back: 'closeup_back',
+			};
+
+			fileName = visualTypeMap[visualType] || `visual_${index + 1}`;
+			const filePath = `${sanitizedCollectionName}/${sanitizedProductName}/${fileName}.${ext}`;
+
+			archive.append(buffer, { name: filePath });
 		});
 
 		archive.finalize();
 
 		return {
 			archive,
-			filename: `generation-${generation.id}.zip`,
+			filename: `ROMIMI_${sanitizedCollectionName}_${sanitizedProductName}_${generation.id.slice(0, 8)}.zip`,
 		};
+	}
+
+	private sanitizeFileName(name: string): string {
+		return name
+			.replace(/[^a-zA-Z0-9_-]/g, '_')
+			.replace(/_{2,}/g, '_')
+			.replace(/^_|_$/g, '')
+			.slice(0, 50);
 	}
 
 	private extractPrompts(visuals: any[]): string[] {
@@ -234,16 +326,6 @@ export class GenerationsService {
 			.filter(Boolean) as string[];
 	}
 
-	private extractGeneratedImages(visuals: any[]): Array<{ data: string; mimeType: string }> {
-		return visuals
-			.map((item) => {
-				if (item && typeof item === 'object' && item.data && item.mimeType) {
-					return { data: item.data, mimeType: item.mimeType };
-				}
-				return null;
-			})
-			.filter(Boolean) as Array<{ data: string; mimeType: string }>;
-	}
 
 	private extensionFromMime(mimeType: string): string {
 		switch (mimeType) {

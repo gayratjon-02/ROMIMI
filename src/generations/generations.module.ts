@@ -6,14 +6,17 @@ import { Generation } from '../database/entities/generation.entity';
 import { Product } from '../database/entities/product.entity';
 import { Collection } from '../database/entities/collection.entity';
 import { AiModule } from '../ai/ai.module';
+import { GenerationQueueModule } from './generation.queue';
+import { GenerationsGateway } from './generations.gateway';
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Generation, Product, Collection]),
 		AiModule,
+		GenerationQueueModule,
 	],
 	controllers: [GenerationsController],
-	providers: [GenerationsService],
-	exports: [GenerationsService],
+	providers: [GenerationsService, GenerationsGateway],
+	exports: [GenerationsService, GenerationsGateway],
 })
 export class GenerationsModule {}

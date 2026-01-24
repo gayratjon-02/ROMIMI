@@ -61,6 +61,11 @@ export class GenerationsController {
 		return this.generationsService.generate(id, user.id, dto);
 	}
 
+	@Get('getProgress/:id')
+	async getProgress(@Param('id') id: string, @CurrentUser() user: User) {
+		return this.generationsService.getGenerationProgress(id, user.id);
+	}
+
 	@Get('download/:id')
 	async download(
 		@Param('id') id: string,

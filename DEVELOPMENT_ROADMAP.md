@@ -119,27 +119,30 @@
 
 ---
 
-### **Faza 5: Generations Module (2-3 kun)**
+### **Faza 5: Generations Module (2-3 kun)** ✅
 
-#### 5.1 Generations Module
-- [ ] Generations service va controller
-- [ ] DTOs:
-  - `CreateGenerationDto` (product_id, collection_id, generation_type, aspect_ratio, resolution)
-  - `UpdateGenerationDto`
-  - `GenerateDto`
-- [ ] Endpoints:
-  - `POST /api/generations` — Generation yaratish
-  - `GET /api/generations` — Barcha generationlar (filter, pagination)
-  - `GET /api/generations/:id` — Bitta generation
-  - `GET /api/generations/:id/preview` — Promptlarni ko'rsatish
-  - `PUT /api/generations/:id/prompts` — Promptlarni yangilash
-  - `POST /api/generations/:id/generate` — Rasm generatsiya qilish (Gemini)
-  - `GET /api/generations/:id/download` — ZIP file yuklab olish
+#### 5.1 Generations Module ✅
+- [x] Generations service va controller
+- [x] DTOs:
+  - `CreateGenerationDto` (product_id, collection_id, generation_type, aspect_ratio, resolution) ✅
+  - `UpdateGenerationDto` ✅
+  - `GenerateDto` ✅
+- [x] Endpoints:
+  - `POST /api/generations/createGeneration` — Generation yaratish ✅
+  - `GET /api/generations/getAllGenerations` — Barcha generationlar (filter, pagination) ✅
+  - `GET /api/generations/getGeneration/:id` — Bitta generation ✅
+  - `GET /api/generations/getPrompts/:id` — Promptlarni ko'rsatish ✅
+  - `POST /api/generations/updatePrompts/:id` — Promptlarni yangilash ✅
+  - `POST /api/generations/generate/:id` — Rasm generatsiya qilish (Gemini) ✅
+  - `GET /api/generations/getProgress/:id` — Progress tracking ✅
+  - `GET /api/generations/download/:id` — ZIP file yuklab olish ✅
 
-#### 5.2 Generation Workflow
-- [ ] Background job yoki queue (Bull/BullMQ) — rasm generatsiya uchun
-- [ ] Real-time updates (WebSocket yoki SSE)
-- [ ] Progress tracking (status: pending → processing → completed/failed)
+#### 5.2 Generation Workflow ✅
+- [x] Background job queue (BullMQ) — rasm generatsiya uchun ✅
+- [x] Real-time updates (WebSocket) ✅
+- [x] Progress tracking (status: pending → processing → completed/failed) ✅
+- [x] Individual visual progress tracking ✅
+- [x] Error handling va retry mechanism ✅
 
 ---
 
