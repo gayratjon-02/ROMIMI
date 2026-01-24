@@ -61,6 +61,30 @@ export class GenerationsController {
 		return this.generationsService.generate(id, user.id, dto);
 	}
 
+	@Post('reset/:id')
+	async resetGeneration(@Param('id') id: string, @CurrentUser() user: User): Promise<Generation> {
+		return this.generationsService.resetGeneration(id, user.id);
+	}
+
+	@Get('debug/config')
+	async debugConfig(@CurrentUser() user: User): Promise<{
+		gemini_configured: boolean;
+		model: string;
+		redis_connected: boolean;
+	}> {
+		return this.generationsService.debugConfig();
+	}
+
+	@Post('debug/test-job')
+	async testJob(@CurrentUser() user: User): Promise<{ message: string }> {
+		return this.generationsService.testJob();
+	}
+
+	@Post('debug/clear-queue')
+	async clearQueue(@CurrentUser() user: User): Promise<{ message: string }> {
+		return this.generationsService.clearQueue();
+	}
+
 	@Get('getProgress/:id')
 	async getProgress(@Param('id') id: string, @CurrentUser() user: User) {
 		return this.generationsService.getGenerationProgress(id, user.id);

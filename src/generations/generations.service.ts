@@ -4,12 +4,14 @@ import {
 	Injectable,
 	InternalServerErrorException,
 	NotFoundException,
+	Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import archiver from 'archiver';
+import * as archiver from 'archiver';
 
 import { Generation } from '../database/entities/generation.entity';
 import { Product } from '../database/entities/product.entity';
@@ -30,6 +32,8 @@ type GenerationFilters = {
 
 @Injectable()
 export class GenerationsService {
+	private readonly logger = new Logger(GenerationsService.name);
+
 	constructor(
 		@InjectRepository(Generation)
 		private readonly generationsRepository: Repository<Generation>,
@@ -42,6 +46,8 @@ export class GenerationsService {
 
 		@InjectQueue('generation')
 		private readonly generationQueue: Queue<GenerationJobData>,
+
+		private readonly configService: ConfigService,
 	) {}
 
 	async create(userId: string, dto: CreateGenerationDto): Promise<Generation> {
@@ -194,6 +200,135 @@ export class GenerationsService {
 			...generation,
 			job_id: job.id.toString(),
 		} as Generation & { job_id: string };
+	}
+
+	async resetGeneration(id: string, userId: string): Promise<Generation> {
+		const generation = await this.findOne(id, userId);
+
+		// Reset generation status
+		generation.status = GenerationStatus.PENDING;
+		generation.completed_at = null;
+		
+		// Clear any existing visuals progress
+		if (generation.visuals) {
+			generation.visuals = generation.visuals.map((visual: any) => ({
+				...visual,
+				status: 'pending',
+				image_url: null,
+				error: null,
+			}));
+		}
+
+		await this.generationsRepository.save(generation);
+
+		this.logger.log(`Generation ${id} has been reset to pending status`);
+		return generation;
+	}
+
+	async debugConfig(): Promise<{
+		gemini_configured: boolean;
+		model: string;
+		redis_connected: boolean;
+		queue_status: any;
+		active_jobs: any[];
+		failed_jobs: any[];
+	}> {
+		const geminiApiKey = this.configService.get<string>('gemini.apiKey');
+		
+		this.logger.log(`Debug - Gemini API Key configured: ${!!geminiApiKey}`);
+		
+		let redisConnected = false;
+		let jobCounts = {};
+		let activeJobs = [];
+		let failedJobs = [];
+		
+		try {
+			jobCounts = await this.generationQueue.getJobCounts();
+			redisConnected = true;
+			
+			// Get active jobs
+			activeJobs = await this.generationQueue.getActive();
+			
+			// Get failed jobs
+			failedJobs = await this.generationQueue.getFailed();
+			
+			this.logger.log(`Debug - Redis connected. Job counts: ${JSON.stringify(jobCounts)}`);
+			this.logger.log(`Debug - Active jobs: ${activeJobs.length}`);
+			this.logger.log(`Debug - Failed jobs: ${failedJobs.length}`);
+			
+		} catch (error) {
+			this.logger.error(`Debug - Redis/Queue error: ${error.message}`);
+		}
+
+		return {
+			gemini_configured: !!geminiApiKey,
+			model: 'gemini-2.5-flash-image',
+			redis_connected: redisConnected,
+			queue_status: jobCounts,
+			active_jobs: activeJobs.map(job => ({ 
+				id: job.id, 
+				name: job.name,
+				data: job.data,
+				processedOn: job.processedOn,
+				finishedOn: job.finishedOn 
+			})),
+			failed_jobs: failedJobs.map(job => ({ 
+				id: job.id, 
+				name: job.name, 
+				failedReason: job.failedReason,
+				data: job.data
+			}))
+		};
+	}
+
+	async testJob(): Promise<{ message: string }> {
+		this.logger.log('🧪 Adding test job to queue...');
+		
+		const job = await this.generationQueue.add(
+			{
+				generationId: 'test-job-' + Date.now(),
+				prompts: ['Test prompt for debugging'],
+				model: 'test-model',
+			},
+			{
+				jobId: `test-${Date.now()}`,
+				removeOnComplete: false,
+				removeOnFail: false,
+			},
+		);
+
+		this.logger.log(`🧪 Test job added with ID: ${job.id}`);
+		
+		return {
+			message: `Test job added with ID: ${job.id}. Check logs for processing.`,
+		};
+	}
+
+	async clearQueue(): Promise<{ message: string }> {
+		this.logger.log('🧹 Clearing all jobs from queue...');
+
+		try {
+			// Clean failed jobs
+			await this.generationQueue.clean(0, 'failed');
+			
+			// Clean active jobs  
+			await this.generationQueue.clean(0, 'active');
+			
+			// Clean completed jobs
+			await this.generationQueue.clean(0, 'completed');
+
+			const jobCounts = await this.generationQueue.getJobCounts();
+			this.logger.log(`🧹 Queue cleared. New counts: ${JSON.stringify(jobCounts)}`);
+
+			return {
+				message: `Queue cleared successfully. New job counts: ${JSON.stringify(jobCounts)}`,
+			};
+		} catch (error) {
+			this.logger.error(`Failed to clear queue: ${error.message}`);
+			return {
+				message: `Failed to clear queue: ${error.message}`,
+			};
+		}
 	}
 
 	async getGenerationProgress(id: string, userId: string): Promise<{

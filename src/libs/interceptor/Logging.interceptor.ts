@@ -89,9 +89,43 @@ export class LoggingInterceptor implements NestInterceptor {
 
 	private getResponseSize(data: any): string {
 		if (!data) return '0 B';
-		const size = JSON.stringify(data).length;
-		if (size < 1024) return `${size} B`;
-		if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
-		return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+		
+		// Handle Buffer responses (like file downloads)
+		if (Buffer.isBuffer(data)) {
+			const size = data.length;
+			if (size < 1024) return `${size} B`;
+			if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
+			return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+		}
+		
+		// Handle streams or complex objects that might have circular references
+		if (typeof data === 'object' && data.constructor && 
+			(data.constructor.name.includes('Stream') || 
+			 data.constructor.name.includes('Archiver') ||
+			 data.constructor.name.includes('Readable'))) {
+			return 'Binary/Stream data';
+		}
+		
+		try {
+			// Use a JSON.stringify replacer to handle circular references
+			const jsonString = JSON.stringify(data, (key, value) => {
+				if (typeof value === 'object' && value !== null) {
+					// Skip circular references and complex objects
+					if (value.constructor && 
+						(value.constructor.name.includes('Stream') || 
+						 value.constructor.name.includes('Archiver') ||
+						 value.constructor.name.includes('Readable'))) {
+						return '[Circular/Stream Object]';
+					}
+				}
+				return value;
+			});
+			const size = jsonString.length;
+			if (size < 1024) return `${size} B`;
+			if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
+			return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+		} catch (e) {
+			return 'N/A';
+		}
 	}
 }

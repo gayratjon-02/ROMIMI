@@ -7,6 +7,7 @@ import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import uploadConfig from './config/upload.config';
+import geminiConfig from './config/gemini.config';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -21,7 +22,7 @@ import { GenerationsModule } from './generations/generations.module';
 	imports: [
 		ConfigModule.forRoot({
 			isGlobal: true,
-			load: [databaseConfig, appConfig, jwtConfig, uploadConfig],
+			load: [databaseConfig, appConfig, jwtConfig, uploadConfig, geminiConfig],
 		}),
 
 		// BullMQ Configuration

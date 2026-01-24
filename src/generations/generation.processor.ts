@@ -27,7 +27,8 @@ export class GenerationProcessor {
 	async processGeneration(job: Job<GenerationJobData>): Promise<void> {
 		const { generationId, prompts, model } = job.data;
 
-		this.logger.log(`Processing generation ${generationId} with ${prompts.length} prompts`);
+		this.logger.log(`🚀 [PROCESSOR] Starting job ${job.id} for generation ${generationId}`);
+		this.logger.log(`🚀 [PROCESSOR] Processing generation ${generationId} with ${prompts.length} prompts`);
 
 		try {
 			// Update status to processing
