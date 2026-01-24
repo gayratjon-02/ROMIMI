@@ -90,9 +90,16 @@ async function bootstrap() {
 			},
 		});
 
+		// 🔧 Enhanced CORS for SSE support
 		app.enableCors({
-			origin: process.env.FRONTEND_URL || '*',
+			origin: [
+				process.env.FRONTEND_URL || 'http://localhost:3000',
+				'http://localhost:3001', // Next.js dev server fallback port
+				'http://localhost:5030', // Production frontend port
+			],
 			credentials: true,
+			methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+			allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Connection'],
 		});
 
 		const configService = app.get(ConfigService);

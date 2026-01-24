@@ -498,8 +498,13 @@ export class GenerationsService {
 			timestamp: new Date().toISOString()
 		};
 		
-		this.logger.log(`Emitting SSE event for generation ${generationId}: ${event.type}`);
+		this.logger.log(`🎯 SSE: Emitting event for generation ${generationId}: ${event.type} (visualIndex: ${event.visualIndex})`);
+		console.log('📡 SSE Event Data:', JSON.stringify(eventData, null, 2));
+		
 		this.generationEvents.next(eventData);
+		
+		// Verify the event was emitted
+		this.logger.log(`✅ SSE: Event emitted successfully to ${this.generationEvents.observers?.length || 0} observers`);
 	}
 
 	/**

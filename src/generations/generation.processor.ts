@@ -57,16 +57,25 @@ export class GenerationProcessor {
 			await this.generationsRepository.save(generation);
 
 			// 🚀 CRITICAL: Process all prompts in PARALLEL for true real-time progressive rendering
-			this.logger.log(`Starting parallel generation of ${prompts.length} images for generation ${generationId}`);
+			this.logger.log(`🚀 STARTING PARALLEL GENERATION: ${prompts.length} images for generation ${generationId}`);
+			console.log('🔍 Generation Details:', {
+				generationId,
+				userId: generation.user_id,
+				promptCount: prompts.length,
+				visualTypes: visuals.map(v => v.type)
+			});
 			
 			// Start all images processing simultaneously
 			const imagePromises = prompts.map(async (prompt, i) => {
+				console.log(`🎯 Starting image ${i + 1}: ${visuals[i]?.type || 'unknown'}`);
+				
 				// Emit processing event immediately when starting
 				if (visuals[i]) {
 					visuals[i].status = 'processing';
 					generation.visuals = visuals;
 					await this.generationsRepository.save(generation);
 					
+					console.log(`📡 Emitting PROCESSING event for visual ${i}`);
 					this.generationsService.emitVisualProcessing(generationId, generation.user_id, i, visuals[i].type);
 					this.logger.log(`🔥 Started generating image ${i + 1}/${prompts.length} (${visuals[i].type}) for generation ${generationId}`);
 				}
@@ -92,6 +101,9 @@ export class GenerationProcessor {
 					await this.generationsRepository.save(generation);
 					
 					// 🎯 Emit completion event immediately when THIS image is ready
+					console.log(`🎉 IMAGE ${i + 1} COMPLETED! Emitting SSE event for visual ${i} (${visuals[i].type})`);
+					console.log('📸 Image data length:', visuals[i].image_url ? visuals[i].image_url.length : 'NO IMAGE');
+					
 					this.generationsService.emitVisualCompleted(generationId, generation.user_id, i, visuals[i]);
 					
 					this.logger.log(`✅ Completed image ${i + 1}/${prompts.length} (${visuals[i].type}) for generation ${generationId}`);

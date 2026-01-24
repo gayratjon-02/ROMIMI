@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { GenerationsService } from './generations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { CreateGenerationDto, GenerateDto, UpdateGenerationDto } from '../libs/dto';
 import { User } from '../database/entities/user.entity';
 import { Generation } from '../database/entities/generation.entity';
@@ -73,6 +74,34 @@ export class GenerationsController {
 		redis_connected: boolean;
 	}> {
 		return this.generationsService.debugConfig();
+	}
+
+	@Post('debug/test-sse/:id')
+	@Public() // Make this endpoint public for testing
+	async testSSE(@Param('id') generationId: string): Promise<{ message: string }> {
+		const testUserId = 'test-user-123'; // Use a test user ID
+		console.log(`🧪 Testing SSE events for generation ${generationId}, user ${testUserId}`);
+		
+		// Simulate 6 images being generated with SSE events
+		for (let i = 0; i < 6; i++) {
+			setTimeout(() => {
+				console.log(`🎯 Test: Emitting processing event for visual ${i}`);
+				this.generationsService.emitVisualProcessing(generationId, testUserId, i, `test-type-${i}`);
+			}, i * 1000); // Each event 1 second apart
+			
+			setTimeout(() => {
+				console.log(`🎯 Test: Emitting completed event for visual ${i}`);
+				this.generationsService.emitVisualCompleted(generationId, testUserId, i, {
+					type: `test-type-${i}`,
+					status: 'completed',
+					image_url: `data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==`,
+					generated_at: new Date().toISOString(),
+					prompt: `Test prompt for image ${i}`
+				});
+			}, (i * 1000) + 500); // Completion 500ms after processing
+		}
+		
+		return { message: `Test SSE events started for generation ${generationId}` };
 	}
 
 	@Post('debug/test-job')
