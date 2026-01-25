@@ -50,24 +50,6 @@ async function bootstrap() {
 		// API prefix
 		app.setGlobalPrefix('api');
 
-		// 🚀 CRITICAL: Serve static files from uploads directory
-		const uploadConfig = app.get(ConfigService).get<any>('upload');
-		const localPath = uploadConfig?.localPath || 'uploads';
-		const uploadsPath = join(process.cwd(), localPath);
-		
-		// Ensure uploads directory exists
-		const fs = require('fs');
-		if (!fs.existsSync(uploadsPath)) {
-			fs.mkdirSync(uploadsPath, { recursive: true });
-		}
-		
-		// Serve static files from uploads directory
-		app.useStaticAssets(uploadsPath, {
-			prefix: `/${localPath}/`,
-		});
-		
-		logger.log(`📁 Serving static files from: ${uploadsPath} at /${localPath}/`);
-
 		// Swagger/OpenAPI Documentation
 		const config = new DocumentBuilder()
 			.setTitle('ROMIMI Visual Generator API')
@@ -120,6 +102,7 @@ async function bootstrap() {
 			allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Connection'],
 		});
 
+		// 🚀 CRITICAL: Serve static files from uploads directory
 		const configService = app.get(ConfigService);
 		const uploadConfig = configService.get<any>('upload');
 		if (uploadConfig?.localPath) {
