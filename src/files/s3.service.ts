@@ -71,14 +71,17 @@ export class S3Service {
 			let url: string;
 			if (this.baseUrl) {
 				url = `${this.baseUrl.replace(/\/$/, '')}/${cleanPath}`;
-			} else if (this.s3Client.config.endpoint) {
-				// Custom endpoint (R2, MinIO, etc.)
-				const endpoint = this.s3Client.config.endpoint as string;
-				url = `${endpoint.replace(/\/$/, '')}/${this.bucket}/${cleanPath}`;
 			} else {
-				// Standard AWS S3 URL
-				const region = this.s3Client.config.region || 'us-east-1';
-				url = `https://${this.bucket}.s3.${region}.amazonaws.com/${cleanPath}`;
+				// Check for custom endpoint (R2, MinIO, etc.)
+				const endpointConfig = this.s3Client.config.endpoint;
+				if (endpointConfig && typeof endpointConfig === 'object' && 'url' in endpointConfig) {
+					const endpoint = (endpointConfig as any).url as string;
+					url = `${endpoint.replace(/\/$/, '')}/${this.bucket}/${cleanPath}`;
+				} else {
+					// Standard AWS S3 URL
+					const region = this.s3Client.config.region || 'us-east-1';
+					url = `https://${this.bucket}.s3.${region}.amazonaws.com/${cleanPath}`;
+				}
 			}
 
 			this.logger.log(`✅ Uploaded to S3: ${cleanPath} (${buffer.length} bytes)`);
@@ -122,12 +125,16 @@ export class S3Service {
 		if (this.baseUrl) {
 			return `${this.baseUrl.replace(/\/$/, '')}/${cleanPath}`;
 		} else if (this.s3Client?.config.endpoint) {
-			const endpoint = this.s3Client.config.endpoint as string;
-			return `${endpoint.replace(/\/$/, '')}/${this.bucket}/${cleanPath}`;
-		} else {
-			const region = this.s3Client?.config.region || 'us-east-1';
-			return `https://${this.bucket}.s3.${region}.amazonaws.com/${cleanPath}`;
+			const endpointConfig = this.s3Client.config.endpoint;
+			if (typeof endpointConfig === 'object' && 'url' in endpointConfig) {
+				const endpoint = (endpointConfig as any).url as string;
+				return `${endpoint.replace(/\/$/, '')}/${this.bucket}/${cleanPath}`;
+			}
 		}
+		
+		// Standard AWS S3 URL
+		const region = this.s3Client?.config.region || 'us-east-1';
+		return `https://${this.bucket}.s3.${region}.amazonaws.com/${cleanPath}`;
 	}
 
 	isEnabled(): boolean {

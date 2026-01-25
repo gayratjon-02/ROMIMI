@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { GenerationsService } from './generations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';

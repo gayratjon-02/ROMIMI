@@ -122,7 +122,7 @@ export class ProductsController {
 	async analyzeProduct(
 		@Param('id') id: string,
 		@CurrentUser() user: User,
-	): Promise<{ extracted_variables: Record<string, any>; generations: Array<{ id: string; visuals: any[] }> }> {
+	): Promise<{ extracted_variables: Record<string, any>; visuals: any[] }> {
 		return this.productsService.analyzeProduct(id, user.id);
 	}
 }

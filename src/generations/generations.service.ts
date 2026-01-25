@@ -412,9 +412,11 @@ export class GenerationsService {
 		const sanitizedCollectionName = this.sanitizeFileName(collectionName);
 		const sanitizedProductName = this.sanitizeFileName(productName);
 
-		visuals.forEach((visual: any, index: number) => {
+		// Process visuals sequentially to handle async fetch
+		for (let index = 0; index < visuals.length; index++) {
+			const visual = visuals[index];
 			if (!visual || visual.status !== 'completed') {
-				return; // Skip failed or pending visuals
+				continue; // Skip failed or pending visuals
 			}
 
 			let buffer: Buffer;
@@ -443,19 +445,19 @@ export class GenerationsService {
 							ext = this.extensionFromMime(contentType);
 						} else {
 							this.logger.warn(`Failed to fetch image from URL: ${visual.image_url}`);
-							return; // Skip if fetch fails
+							continue; // Skip if fetch fails
 						}
 					} catch (error) {
 						this.logger.error(`Error fetching image from URL: ${visual.image_url}`, error);
-						return; // Skip on error
+						continue; // Skip on error
 					}
 				} else {
 					// Skip if not base64 or URL
-					return;
+					continue;
 				}
 			} else {
 				// Skip if no data
-				return;
+				continue;
 			}
 
 			// Generate filename based on visual type
@@ -474,7 +476,7 @@ export class GenerationsService {
 			const filePath = `ROMIMI/${sanitizedCollectionName}/${sanitizedProductName}/${fileName}.${ext}`;
 
 			archive.append(buffer, { name: filePath });
-		});
+		}
 
 		archive.finalize();
 
