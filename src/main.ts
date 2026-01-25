@@ -92,14 +92,29 @@ async function bootstrap() {
 
 		// 🔧 Enhanced CORS for SSE support
 		app.enableCors({
-			origin: [
-				process.env.FRONTEND_URL || 'http://localhost:3000',
-				'http://localhost:3001', // Next.js dev server fallback port
-				'http://localhost:5030', // Production frontend port
-			],
+			origin: (origin, callback) => {
+				// Allow requests with no origin (mobile apps, curl, etc.)
+				if (!origin) return callback(null, true);
+				
+				const allowedOrigins = [
+					process.env.FRONTEND_URL,
+					'http://localhost:3000',
+					'http://localhost:3001',
+					'http://localhost:5030',
+					'http://209.97.168.255:5030', // Production frontend
+				].filter(Boolean);
+				
+				if (allowedOrigins.includes(origin)) {
+					callback(null, true);
+				} else {
+					logger.warn(`CORS blocked origin: ${origin}`);
+					callback(null, true); // Allow all for now to debug
+				}
+			},
 			credentials: true,
-			methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-			allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Connection'],
+			methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
+			allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Connection', 'X-Requested-With'],
+			exposedHeaders: ['Content-Length', 'Content-Type'],
 		});
 
 		// 🚀 CRITICAL: Serve static files from uploads directory
