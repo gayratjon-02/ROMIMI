@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm ci   # <-- bu yerda --only=production ni olib tashladik
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 RUN npm run build
