@@ -21,81 +21,131 @@ export class GeminiService {
 		aspectRatio?: string,
 		resolution?: string
 	): Promise<GeminiImageResult> {
-		try {
-			// 🚀 CRITICAL: Use Gemini 2.5 Flash Image Preview for image generation
-			const modelId = modelName || this.defaultModel;
-			const model = this.getModel(modelId);
+		const maxRetries = 3;
+		const baseDelay = 2000; // 2 seconds base delay
+		
+		for (let attempt = 0; attempt < maxRetries; attempt++) {
+			try {
+				// 🚀 CRITICAL: Use Gemini 2.5 Flash Image Preview for image generation
+				const modelId = modelName || this.defaultModel;
+				const model = this.getModel(modelId);
 
-			this.logger.log(`🎨 Starting Gemini image generation (${modelId}) for prompt: ${prompt.substring(0, 100)}...`);
-			if (aspectRatio) {
-				this.logger.log(`Aspect ratio: ${aspectRatio}`);
-			}
-			if (resolution) {
-				this.logger.log(`Resolution: ${resolution}`);
-			}
+				if (attempt === 0) {
+					this.logger.log(`🎨 Starting Gemini image generation (${modelId}) for prompt: ${prompt.substring(0, 100)}...`);
+					if (aspectRatio) {
+						this.logger.log(`Aspect ratio: ${aspectRatio}`);
+					}
+					if (resolution) {
+						this.logger.log(`Resolution: ${resolution}`);
+					}
+				} else {
+					this.logger.log(`🔄 Retry attempt ${attempt + 1}/${maxRetries} for Gemini image generation...`);
+				}
 
-			// 🎨 Sanitize prompt to avoid PII policy violations
-			let sanitizedPrompt = prompt
-				.replace(/\b(young|old|middle-aged)\s+(man|woman|person|model)\b/gi, 'professional model')
-				.replace(/\b(confident|smiling|happy)\s+(young|old|middle-aged)?\s*(man|woman|person|model)\b/gi, 'professional model')
-				.replace(/\bfather\s+and\s+son\b/gi, 'two professional models')
-				.replace(/\bperson\b/gi, 'professional model')
-				.replace(/\bpeople\b/gi, 'professional models');
-			
-			// 🎨 Build enhanced prompt for product photography
-			const ratioText = aspectRatio || '1:1';
-			const resolutionText = resolution ? `${resolution} resolution` : 'high resolution';
-			let enhancedPrompt = `Professional product photography: ${sanitizedPrompt}. Aspect ratio: ${ratioText}. ${resolutionText}. High quality, sharp details, perfect lighting.`;
+				// 🎨 Sanitize prompt to avoid PII policy violations
+				let sanitizedPrompt = prompt
+					.replace(/\b(young|old|middle-aged)\s+(man|woman|person|model)\b/gi, 'professional model')
+					.replace(/\b(confident|smiling|happy)\s+(young|old|middle-aged)?\s*(man|woman|person|model)\b/gi, 'professional model')
+					.replace(/\bfather\s+and\s+son\b/gi, 'two professional models')
+					.replace(/\bperson\b/gi, 'professional model')
+					.replace(/\bpeople\b/gi, 'professional models');
+				
+				// 🎨 Build enhanced prompt for product photography
+				const ratioText = aspectRatio || '1:1';
+				const resolutionText = resolution ? `${resolution} resolution` : 'high resolution';
+				let enhancedPrompt = `Professional product photography: ${sanitizedPrompt}. Aspect ratio: ${ratioText}. ${resolutionText}. High quality, sharp details, perfect lighting.`;
 
-			this.logger.log(`📐 Using aspect ratio: ${ratioText}`);
-			this.logger.log(`📝 Final prompt: ${enhancedPrompt.substring(0, 200)}...`);
+				if (attempt === 0) {
+					this.logger.log(`📐 Using aspect ratio: ${ratioText}`);
+					this.logger.log(`📝 Final prompt: ${enhancedPrompt.substring(0, 200)}...`);
+				}
 
-			// 🚀 CRITICAL: Call Gemini image generation model
-			const result = await model.generateContent({
-				contents: [
-					{
-						role: 'user',
-						parts: [
+				// 🚀 CRITICAL: Call Gemini image generation model
+				// Try with responseMimeType first, fallback to default if it fails
+				let result;
+				try {
+					result = await model.generateContent({
+						contents: [
 							{
-								text: enhancedPrompt,
+								role: 'user',
+								parts: [
+									{
+										text: enhancedPrompt,
+									},
+								],
 							},
 						],
-					},
-				],
-				generationConfig: {
-					responseMimeType: 'image/png', // Request image output
-				},
-			});
+						generationConfig: {
+							responseMimeType: 'image/png', // Request image output
+						},
+					});
+				} catch (configError: any) {
+					// If responseMimeType is not supported, try without it
+					this.logger.warn(`⚠️ responseMimeType not supported, trying without it...`);
+					result = await model.generateContent({
+						contents: [
+							{
+								role: 'user',
+								parts: [
+									{
+										text: enhancedPrompt,
+									},
+								],
+							},
+						],
+					});
+				}
 
-			const response = result.response;
+				const response = result.response;
 
-			// 🚀 CRITICAL: Check for inline image data FIRST
-			const inlineData = this.extractInlineData(response);
+				// 🚀 CRITICAL: Check for inline image data FIRST
+				const inlineData = this.extractInlineData(response);
 
-			if (inlineData?.data) {
-				this.logger.log(`✅ Successfully generated image (${inlineData.mimeType}), data length: ${inlineData.data.length}`);
-				return {
-					mimeType: inlineData.mimeType,
-					data: inlineData.data,
-				};
+				if (inlineData?.data) {
+					this.logger.log(`✅ Successfully generated image (${inlineData.mimeType}), data length: ${inlineData.data.length}`);
+					return {
+						mimeType: inlineData.mimeType,
+						data: inlineData.data,
+					};
+				}
+
+				// 🚀 CRITICAL: If no image data, log error and throw exception
+				const text = response.text();
+				this.logger.error(`❌ Gemini API returned text instead of image!`);
+				this.logger.error(`Response text: ${text.substring(0, 200)}...`);
+				this.logger.error(`Response candidates:`, JSON.stringify(response.candidates, null, 2));
+				
+				// Throw error instead of returning text
+				throw new InternalServerErrorException(
+					`Gemini API did not generate an image. Response: ${text.substring(0, 100)}`
+				);
+			} catch (error: any) {
+				const status = error?.status || error?.response?.status;
+				const isRetryable = status === 429 || status === 503 || status === 529 || status >= 500;
+				const errorMessage = error?.response?.error ? JSON.stringify(error.response.error) : error?.message || String(error);
+				
+				this.logger.warn(`Gemini generateImage attempt ${attempt + 1}/${maxRetries} failed:`, {
+					status,
+					message: errorMessage.substring(0, 200),
+					isRetryable,
+				});
+
+				// If it's a retryable error and we have retries left, wait and retry
+				if (isRetryable && attempt < maxRetries - 1) {
+					const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff: 2s, 4s, 8s
+					this.logger.log(`⏳ Gemini API error (${status}), retrying in ${delay}ms...`);
+					await new Promise(resolve => setTimeout(resolve, delay));
+					continue;
+				}
+
+				// If not retryable or out of retries, throw error
+				this.logger.error(`Gemini generateImage failed after ${attempt + 1} attempts: ${errorMessage}`);
+				throw new InternalServerErrorException(AIMessage.GEMINI_API_ERROR);
 			}
-
-			// 🚀 CRITICAL: If no image data, log error and throw exception
-			const text = response.text();
-			this.logger.error(`❌ Gemini API returned text instead of image!`);
-			this.logger.error(`Response text: ${text.substring(0, 200)}...`);
-			this.logger.error(`Response candidates:`, JSON.stringify(response.candidates, null, 2));
-			
-			// Throw error instead of returning text
-			throw new InternalServerErrorException(
-				`Gemini API did not generate an image. Response: ${text.substring(0, 100)}`
-			);
-		} catch (error: any) {
-			const errorMessage = error?.response?.error ? JSON.stringify(error.response.error) : error?.message || String(error);
-			this.logger.error(`Gemini generateImage failed: ${errorMessage}`);
-
-			throw new InternalServerErrorException(AIMessage.GEMINI_API_ERROR);
 		}
+
+		// This should never be reached, but TypeScript needs it
+		throw new InternalServerErrorException(AIMessage.GEMINI_API_ERROR);
 	}
 
 	async generateBatch(prompts: string[], modelName?: string): Promise<GeminiImageResult[]> {

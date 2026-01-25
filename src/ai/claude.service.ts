@@ -277,29 +277,56 @@ export class ClaudeService {
 		content: ClaudeContentBlock[];
 		max_tokens: number;
 	}): Promise<Messages.Message> {
-		try {
-			const res = await this.getClient().messages.create({
-				model: this.model,
-				max_tokens: params.max_tokens,
-				messages: [
-					{
-						role: 'user',
-						content: params.content,
-					},
-				],
-			});
+		const maxRetries = 3;
+		const baseDelay = 2000; // 2 seconds base delay
+		
+		for (let attempt = 0; attempt < maxRetries; attempt++) {
+			try {
+				const res = await this.getClient().messages.create({
+					model: this.model,
+					max_tokens: params.max_tokens,
+					messages: [
+						{
+							role: 'user',
+							content: params.content,
+						},
+					],
+				});
 
-			return res;
-		} catch (error: any) {
-			this.logger.error('Claude API error', {
-				message: error?.message,
-				name: error?.name,
-				status: error?.status,
-				data: error?.response?.data,
-			});
+				return res;
+			} catch (error: any) {
+				const status = error?.status || error?.response?.status;
+				const isOverloaded = status === 529 || status === 503 || status === 429;
+				
+				this.logger.warn(`Claude API attempt ${attempt + 1}/${maxRetries} failed:`, {
+					status,
+					message: error?.message,
+					isOverloaded,
+				});
 
-			throw new InternalServerErrorException(AIMessage.CLAUDE_API_ERROR);
+				// If it's an overload/rate limit error and we have retries left, wait and retry
+				if (isOverloaded && attempt < maxRetries - 1) {
+					const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff: 2s, 4s, 8s
+					this.logger.log(`⏳ Claude API overloaded (${status}), retrying in ${delay}ms...`);
+					await new Promise(resolve => setTimeout(resolve, delay));
+					continue;
+				}
+
+				// If not overloaded or out of retries, throw error
+				this.logger.error('Claude API error', {
+					message: error?.message,
+					name: error?.name,
+					status: error?.status,
+					data: error?.response?.data,
+					attempt: attempt + 1,
+				});
+
+				throw new InternalServerErrorException(AIMessage.CLAUDE_API_ERROR);
+			}
 		}
+
+		// This should never be reached, but TypeScript needs it
+		throw new InternalServerErrorException(AIMessage.CLAUDE_API_ERROR);
 	}
 
 	private buildProductAnalysisPrompt(input: AnalyzeProductInput): string {
