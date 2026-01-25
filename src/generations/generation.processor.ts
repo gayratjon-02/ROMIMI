@@ -63,26 +63,22 @@ export class GenerationProcessor {
 			generation.visuals = visuals;
 			await this.generationsRepository.save(generation);
 
-			// 📝 Process images SEQUENTIALLY to avoid stall issues and simplify flow
-			this.logger.log(`🚀 STARTING SEQUENTIAL GENERATION: ${prompts.length} images for generation ${generationId}`);
+			// 🚀 PARALLEL GENERATION: All images at once for maximum speed
+			this.logger.log(`🚀 STARTING PARALLEL GENERATION: ${prompts.length} images for generation ${generationId}`);
 			
-			// Process each image one by one
-			for (let i = 0; i < prompts.length; i++) {
-				const prompt = prompts[i];
-				this.logger.log(`🎯 Processing image ${i + 1}/${prompts.length}: ${visuals[i]?.type || 'unknown'}`);
+			// Mark all as processing
+			visuals.forEach(v => v.status = 'processing');
+			generation.visuals = visuals;
+			await this.generationsRepository.save(generation);
+			
+			const geminiModel = model || process.env.GEMINI_MODEL || 'gemini-3-pro-image-preview';
+			
+			// Process ALL images in parallel
+			const imagePromises = prompts.map(async (prompt, i) => {
+				const visualType = visuals[i]?.type || `visual_${i}`;
+				this.logger.log(`🎨 [${i + 1}/${prompts.length}] Starting ${visualType}...`);
 				
-				// Update status to processing
-				visuals[i].status = 'processing';
-				generation.visuals = visuals;
-				await this.generationsRepository.save(generation);
-				
-				// Update job progress
-				job.progress(Math.round((i / prompts.length) * 100));
-
 				try {
-					const geminiModel = model || process.env.GEMINI_MODEL || 'gemini-3-pro-image-preview';
-					this.logger.log(`🎨 Generating image ${i + 1} using Gemini model: ${geminiModel}...`);
-					
 					const result = await this.geminiService.generateImage(
 						prompt, 
 						geminiModel,
@@ -90,20 +86,19 @@ export class GenerationProcessor {
 						generation.resolution
 					);
 					
-					// Save base64 image as file and get URL
+					// Save image
 					let imageUrl: string | null = null;
 					if (result.data) {
 						try {
 							const storedFile = await this.filesService.storeBase64Image(result.data, result.mimeType);
 							imageUrl = storedFile.url;
-							this.logger.log(`✅ Saved image ${i + 1}: ${imageUrl}`);
 						} catch (fileError: any) {
-							this.logger.error(`❌ Failed to save image ${i + 1}: ${fileError.message}`);
+							this.logger.error(`❌ Save failed for ${visualType}: ${fileError.message}`);
 							imageUrl = `data:${result.mimeType};base64,${result.data}`;
 						}
 					}
 					
-					// Update visual with result
+					// Update visual immediately
 					visuals[i] = {
 						...visuals[i],
 						prompt,
@@ -113,24 +108,36 @@ export class GenerationProcessor {
 						generated_at: new Date().toISOString(),
 					};
 					
-					this.logger.log(`✅ Image ${i + 1}/${prompts.length} completed (${visuals[i].type})`);
+					// Save to DB immediately so frontend can see it
+					generation.visuals = [...visuals];
+					await this.generationsRepository.save(generation);
 					
+					this.logger.log(`✅ [${i + 1}/${prompts.length}] ${visualType} completed!`);
+					
+					// Update progress
+					const completed = visuals.filter(v => v.status === 'completed' || v.status === 'failed').length;
+					job.progress(Math.round((completed / prompts.length) * 100));
+					
+					return { success: true, index: i };
 				} catch (error: any) {
-					this.logger.error(`❌ Failed image ${i + 1}: ${error?.message || error}`);
+					this.logger.error(`❌ [${i + 1}/${prompts.length}] ${visualType} failed: ${error?.message}`);
 					
 					visuals[i] = {
 						...visuals[i],
 						status: 'failed',
 						error: error?.message || 'Unknown error',
 					};
+					
+					generation.visuals = [...visuals];
+					await this.generationsRepository.save(generation);
+					
+					return { success: false, index: i, error: error?.message };
 				}
-				
-				// Save progress after each image
-				generation.visuals = visuals;
-				await this.generationsRepository.save(generation);
-			}
+			});
 			
-			// Final progress
+			// Wait for all to complete
+			await Promise.allSettled(imagePromises);
+			
 			job.progress(100);
 
 			// Check final results after sequential processing is complete
