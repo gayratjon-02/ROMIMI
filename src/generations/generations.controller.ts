@@ -57,7 +57,7 @@ export class GenerationsController {
 		return this.generationsService.updatePrompts(id, user.id, dto);
 	}
 
-	@Post('generate/:id')
+	@Post(':id/generate')
 	async generate(@Param('id') id: string, @CurrentUser() user: User, @Body() dto: GenerateDto): Promise<Generation> {
 		return this.generationsService.generate(id, user.id, dto);
 	}

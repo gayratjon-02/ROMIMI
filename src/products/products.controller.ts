@@ -28,7 +28,7 @@ export class ProductsController {
 		private readonly filesService: FilesService,
 	) {}
 
-	@Post('createProduct')
+	@Post()
 	@UseInterceptors(
 		FileFieldsInterceptor([
 			{ name: 'front_image', maxCount: 1 },

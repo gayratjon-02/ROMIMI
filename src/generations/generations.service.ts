@@ -402,13 +402,30 @@ export class GenerationsService {
 				buffer = Buffer.from(visual.data, 'base64');
 				ext = this.extensionFromMime(visual.mimeType || 'image/png');
 			} else if (visual.image_url) {
-				// Data URL
+				// Data URL or HTTP URL
 				const dataUrlMatch = visual.image_url.match(/^data:([^;]+);base64,(.+)$/);
 				if (dataUrlMatch) {
 					buffer = Buffer.from(dataUrlMatch[2], 'base64');
 					ext = this.extensionFromMime(dataUrlMatch[1]);
+				} else if (visual.image_url.startsWith('http://') || visual.image_url.startsWith('https://')) {
+					// Fetch from URL (S3 or local server)
+					try {
+						const response = await fetch(visual.image_url);
+						if (response.ok) {
+							const arrayBuffer = await response.arrayBuffer();
+							buffer = Buffer.from(arrayBuffer);
+							const contentType = response.headers.get('content-type') || 'image/jpeg';
+							ext = this.extensionFromMime(contentType);
+						} else {
+							this.logger.warn(`Failed to fetch image from URL: ${visual.image_url}`);
+							return; // Skip if fetch fails
+						}
+					} catch (error) {
+						this.logger.error(`Error fetching image from URL: ${visual.image_url}`, error);
+						return; // Skip on error
+					}
 				} else {
-					// Skip if not base64
+					// Skip if not base64 or URL
 					return;
 				}
 			} else {
@@ -428,7 +445,8 @@ export class GenerationsService {
 			};
 
 			fileName = visualTypeMap[visualType] || `visual_${index + 1}`;
-			const filePath = `${sanitizedCollectionName}/${sanitizedProductName}/${fileName}.${ext}`;
+			// Spec requires: ROMIMI/{Collection}/{Product}/duo.png...
+			const filePath = `ROMIMI/${sanitizedCollectionName}/${sanitizedProductName}/${fileName}.${ext}`;
 
 			archive.append(buffer, { name: filePath });
 		});

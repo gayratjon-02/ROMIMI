@@ -185,7 +185,7 @@ export class ProductsService {
 	async analyzeProduct(
 		id: string,
 		userId: string,
-	): Promise<{ extracted_variables: Record<string, any>; generations: Array<{ id: string; visuals: any[] }> }> {
+	): Promise<{ extracted_variables: Record<string, any>; visuals: any[] }> {
 		const product = await this.productsRepository.findOne({
 			where: { id },
 			relations: ['collection', 'collection.brand'],
@@ -209,16 +209,16 @@ export class ProductsService {
 			throw new BadRequestException(FileMessage.FILE_NOT_FOUND);
 		}
 
+		// Step 1: Analyze product images to extract variables
 		const extractedVariables = await this.claudeService.analyzeProduct({
 			images,
 			productName: product.name,
 			brandBrief: product.collection.brand.brand_brief || undefined,
 		});
 
-		product.extracted_variables = extractedVariables;
-		await this.productsRepository.save(product);
-
-		const visuals = await this.claudeService.generatePrompts({
+		// Step 2: Generate structured visuals (6 objects with all required fields)
+		const visuals = await this.claudeService.generateStructuredVisuals({
+			images,
 			productName: product.name,
 			brandBrief: product.collection.brand.brand_brief || undefined,
 			extractedVariables,
@@ -227,20 +227,26 @@ export class ProductsService {
 			count: 6,
 		});
 
+		// Step 3: Save extracted_variables to product
+		product.extracted_variables = extractedVariables;
+		await this.productsRepository.save(product);
+
+		// Step 4: Create generation with visuals and status = "processing"
 		const generation = this.generationsRepository.create({
 			product_id: product.id,
 			collection_id: product.collection_id,
 			user_id: userId,
 			generation_type: GenerationType.PRODUCT_VISUALS,
-			visuals,
-			status: GenerationStatus.COMPLETED,
+			visuals: visuals.map(v => ({ ...v, status: 'pending' })), // Initialize with pending status
+			status: GenerationStatus.PROCESSING, // Set to processing as per spec
 		});
 
-		const savedGeneration = await this.generationsRepository.save(generation);
+		await this.generationsRepository.save(generation);
 
+		// Step 5: Return exactly as spec requires
 		return {
 			extracted_variables: extractedVariables,
-			generations: [{ id: savedGeneration.id, visuals: savedGeneration.visuals || [] }],
+			visuals: visuals,
 		};
 	}
 }

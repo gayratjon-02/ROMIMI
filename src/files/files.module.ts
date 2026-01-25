@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { FilesController } from './files.controller';
 import { FilesService } from './files.service';
+import { S3Service } from './s3.service';
 import { FileMessage } from '../libs/enums';
 
 @Module({
@@ -46,7 +47,7 @@ import { FileMessage } from '../libs/enums';
 		}),
 	],
 	controllers: [FilesController],
-	providers: [FilesService],
-	exports: [FilesService, MulterModule],
+	providers: [FilesService, S3Service],
+	exports: [FilesService, S3Service, MulterModule],
 })
 export class FilesModule {}

@@ -95,6 +95,146 @@ export class ClaudeService {
 			.slice(0, count);
 	}
 
+	/**
+	 * Generate structured visuals with all required fields for product visual generation
+	 * Returns array of 6 visual objects with: type, display_name, prompt, negative_prompt, camera, background, garment_details, styling, output
+	 */
+	async generateStructuredVisuals(input: GeneratePromptsInput & { images?: string[] }): Promise<Array<{
+		type: string;
+		display_name: string;
+		prompt: string;
+		negative_prompt: string;
+		camera: string;
+		background: string;
+		garment_details: string;
+		styling: string;
+		output: string;
+	}>> {
+		const visualTypes = ['duo', 'solo', 'flatlay_front', 'flatlay_back', 'closeup_front', 'closeup_back'];
+		const count = visualTypes.length;
+
+		const prompt = this.buildStructuredVisualsPrompt(input, visualTypes);
+
+		const content: ClaudeContentBlock[] = [
+			{ type: 'text', text: prompt },
+			...(input.images ? await this.buildImageBlocks(input.images) : []),
+		];
+
+		const response = await this.createMessage({
+			content,
+			max_tokens: 4000, // Increased for structured output
+		});
+
+		const text = this.extractText(response.content);
+		const parsed = this.parseJson(text);
+
+		// Try to extract visuals array from response
+		let visuals: any[] = [];
+		
+		if (parsed && parsed.visuals && Array.isArray(parsed.visuals)) {
+			visuals = parsed.visuals;
+		} else if (Array.isArray(parsed)) {
+			visuals = parsed;
+		} else if (parsed && typeof parsed === 'object') {
+			// If it's an object, try to find visuals array
+			visuals = Object.values(parsed).find((v: any) => Array.isArray(v)) as any[] || [];
+		}
+
+		// Ensure we have exactly 6 visuals, mapped to the correct types
+		const result: Array<{
+			type: string;
+			display_name: string;
+			prompt: string;
+			negative_prompt: string;
+			camera: string;
+			background: string;
+			garment_details: string;
+			styling: string;
+			output: string;
+		}> = [];
+
+		for (let i = 0; i < visualTypes.length; i++) {
+			const type = visualTypes[i];
+			const visual = visuals[i] || {};
+			
+			result.push({
+				type,
+				display_name: visual.display_name || this.getDisplayName(type),
+				prompt: visual.prompt || '',
+				negative_prompt: visual.negative_prompt || 'blurry, low quality, distorted, watermark',
+				camera: visual.camera || '',
+				background: visual.background || '',
+				garment_details: visual.garment_details || '',
+				styling: visual.styling || '',
+				output: visual.output || '',
+			});
+		}
+
+		return result;
+	}
+
+	private getDisplayName(type: string): string {
+		const names: Record<string, string> = {
+			duo: 'DUO (Father + Son)',
+			solo: 'SOLO (Man alone)',
+			flatlay_front: 'FLAT LAY FRONT',
+			flatlay_back: 'FLAT LAY BACK',
+			closeup_front: 'CLOSE UP FRONT',
+			closeup_back: 'CLOSE UP BACK',
+		};
+		return names[type] || type.toUpperCase();
+	}
+
+	private buildStructuredVisualsPrompt(input: GeneratePromptsInput, visualTypes: string[]): string {
+		const lines = [
+			'Generate exactly 6 structured visual prompts for product photography.',
+			'Return JSON with this exact structure:',
+			'{',
+			'  "visuals": [',
+			'    {',
+			'      "type": "duo",',
+			'      "display_name": "DUO (Father + Son)",',
+			'      "prompt": "detailed prompt text",',
+			'      "negative_prompt": "what to avoid",',
+			'      "camera": "camera settings and angle",',
+			'      "background": "background description",',
+			'      "garment_details": "specific garment details",',
+			'      "styling": "styling notes",',
+			'      "output": "expected output description"',
+			'    },',
+			'    ... (5 more for: solo, flatlay_front, flatlay_back, closeup_front, closeup_back)',
+			'  ]',
+			'}',
+			'',
+			'Visual types required (in order):',
+			visualTypes.map((t, i) => `${i + 1}. ${t}`).join('\n'),
+			'',
+			'Return ONLY valid JSON, no markdown, no code blocks.',
+		];
+
+		if (input.productName) {
+			lines.push(`Product name: ${input.productName}`);
+		}
+
+		if (input.brandBrief) {
+			lines.push(`Brand brief: ${input.brandBrief}`);
+		}
+
+		if (input.extractedVariables) {
+			lines.push(`Extracted variables: ${JSON.stringify(input.extractedVariables)}`);
+		}
+
+		if (input.fixedElements) {
+			lines.push(`Fixed elements: ${JSON.stringify(input.fixedElements)}`);
+		}
+
+		if (input.promptTemplates) {
+			lines.push(`Prompt templates: ${JSON.stringify(input.promptTemplates)}`);
+		}
+
+		return lines.join('\n');
+	}
+
 	async analyzeCompetitorAd(input: AnalyzeCompetitorAdInput): Promise<Record<string, any>> {
 		if (!input.image) {
 			throw new BadRequestException(FileMessage.FILE_NOT_FOUND);
