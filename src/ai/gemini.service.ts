@@ -22,9 +22,11 @@ export class GeminiService {
 		resolution?: string
 	): Promise<GeminiImageResult> {
 		try {
-			const model = this.getModel(modelName);
+			// 🚀 CRITICAL: Use Imagen 4.0 Fast for real image generation
+			const imagenModel = modelName || 'imagen-4.0-fast-generate-001';
+			const model = this.getModel(imagenModel);
 
-			this.logger.log(`Starting image generation for prompt: ${prompt.substring(0, 100)}...`);
+			this.logger.log(`🎨 Starting Imagen 4.0 Fast image generation for prompt: ${prompt.substring(0, 100)}...`);
 			if (aspectRatio) {
 				this.logger.log(`Aspect ratio: ${aspectRatio}`);
 			}
@@ -32,51 +34,36 @@ export class GeminiService {
 				this.logger.log(`Resolution: ${resolution}`);
 			}
 
-			// 🎨 Build enhanced prompt with EXPLICIT aspect ratio and resolution instructions
-			let enhancedPrompt = `Create a photorealistic, high-quality commercial product image: ${prompt}`;
+			// 🎨 Sanitize prompt to avoid PII policy violations
+			let sanitizedPrompt = prompt
+				.replace(/\b(young|old|middle-aged)\s+(man|woman|person|model)\b/gi, 'professional model')
+				.replace(/\b(confident|smiling|happy)\s+(young|old|middle-aged)?\s*(man|woman|person|model)\b/gi, 'professional model')
+				.replace(/\bfather\s+and\s+son\b/gi, 'two professional models')
+				.replace(/\bperson\b/gi, 'professional model')
+				.replace(/\bpeople\b/gi, 'professional models');
+			
+			// 🎨 Build enhanced prompt for product photography
+			let enhancedPrompt = `Professional product photography: ${sanitizedPrompt}`;
 
-			// 📐 Exact dimension mapping for precise aspect ratio and resolution control
-			let dimensions = '';
-			if (aspectRatio && resolution) {
-				const dimensionMap: Record<string, Record<string, string>> = {
-					'4:5': {
-						'2K': 'Image dimensions: 1638x2048 pixels (4:5 portrait ratio, 2K resolution)',
-						'4K': 'Image dimensions: 3072x3840 pixels (4:5 portrait ratio, 4K resolution)',
-					},
-					'1:1': {
-						'2K': 'Image dimensions: 2048x2048 pixels (1:1 square ratio, 2K resolution)',
-						'4K': 'Image dimensions: 3840x3840 pixels (1:1 square ratio, 4K resolution)',
-					},
-					'9:16': {
-						'2K': 'Image dimensions: 1152x2048 pixels (9:16 vertical ratio, 2K resolution)',
-						'4K': 'Image dimensions: 2160x3840 pixels (9:16 vertical ratio, 4K resolution)',
-					},
-				};
-
-				dimensions = dimensionMap[aspectRatio]?.[resolution] || `${aspectRatio} aspect ratio, ${resolution} resolution`;
-			} else if (aspectRatio) {
-				// Fallback if only aspect ratio is provided
-				const aspectRatioMap: Record<string, string> = {
-					'4:5': 'portrait orientation, 4:5 aspect ratio (vertical, taller than wide)',
-					'1:1': 'square format, 1:1 aspect ratio (equal width and height)',
-					'9:16': 'vertical/portrait format, 9:16 aspect ratio (very tall, mobile/Instagram story format)',
-				};
-				dimensions = aspectRatioMap[aspectRatio] || `aspect ratio ${aspectRatio}`;
-			} else if (resolution) {
-				// Fallback if only resolution is provided
-				const resolutionMap: Record<string, string> = {
-					'2K': '2K resolution (high quality)',
-					'4K': '4K resolution (ultra high quality, maximum detail)',
-				};
-				dimensions = resolutionMap[resolution] || `Resolution: ${resolution}`;
+			// 🎨 Map aspect ratio for Imagen 4.0
+			// Imagen supports: 1:1, 3:4, 4:3, 9:16, 16:9
+			let imagenAspectRatio = '1:1'; // Default
+			if (aspectRatio === '4:5') {
+				imagenAspectRatio = '3:4'; // Closest to 4:5
+			} else if (aspectRatio === '9:16') {
+				imagenAspectRatio = '9:16';
+			} else if (aspectRatio === '1:1') {
+				imagenAspectRatio = '1:1';
 			}
 
-			if (dimensions) {
-				enhancedPrompt = `${enhancedPrompt}\n\nIMPORTANT TECHNICAL SPECS:\n${dimensions}. Ultra high quality, professional photography, sharp details, perfect lighting.`;
-			}
+			// Add aspect ratio to prompt
+			enhancedPrompt = `${enhancedPrompt}. Aspect ratio: ${imagenAspectRatio}. High quality, professional photography, sharp details, perfect lighting.`;
 
-			// 🚀 CRITICAL: Use generateContentStream for better image generation support
-			// Try to get image data from response
+			this.logger.log(`📐 Using Imagen aspect ratio: ${imagenAspectRatio}`);
+			this.logger.log(`📝 Final prompt: ${enhancedPrompt.substring(0, 200)}...`);
+
+			// 🚀 CRITICAL: Call Imagen 4.0 Fast API with proper configuration
+			// Imagen 4.0 uses different generation config than text models
 			const result = await model.generateContent({
 				contents: [
 					{
@@ -89,10 +76,8 @@ export class GeminiService {
 					},
 				],
 				generationConfig: {
-					temperature: 0.7,
-					topK: 40,
-					topP: 0.95,
-					maxOutputTokens: 8192, // Increased for image generation
+					// Imagen-specific config
+					responseMimeType: 'image/png', // Request image output
 				},
 			});
 

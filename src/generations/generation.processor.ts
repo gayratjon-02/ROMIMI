@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Generation } from '../database/entities/generation.entity';
 import { GeminiService } from '../ai/gemini.service';
+import { OpenAIService } from '../ai/openai.service';
 import { GenerationStatus } from '../libs/enums';
 import { GenerationsService } from './generations.service';
 import { FilesService } from '../files/files.service';
@@ -24,6 +25,7 @@ export class GenerationProcessor {
 		@InjectRepository(Generation)
 		private readonly generationsRepository: Repository<Generation>,
 		private readonly geminiService: GeminiService,
+		private readonly openaiService: OpenAIService,
 		private readonly generationsService: GenerationsService,
 		private readonly filesService: FilesService,
 	) {}
@@ -88,10 +90,11 @@ export class GenerationProcessor {
 				}
 
 				try {
-					// Generate this image independently with aspect ratio and resolution
+					// 🚀 CRITICAL: Use Imagen 4.0 Fast for real image generation via Gemini API
+					this.logger.log(`🎨 Generating image ${i + 1} using Imagen 4.0 Fast...`);
 					const result = await this.geminiService.generateImage(
 						prompt, 
-						model,
+						model || 'imagen-4.0-fast-generate-001',
 						generation.aspect_ratio,
 						generation.resolution
 					);
