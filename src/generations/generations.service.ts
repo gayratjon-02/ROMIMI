@@ -21,6 +21,8 @@ import { Collection } from '../database/entities/collection.entity';
 import { CreateGenerationDto, GenerateDto, UpdateGenerationDto } from '../libs/dto';
 import { ErrorMessage, GenerationMessage, GenerationStatus, NotFoundMessage, PermissionMessage } from '../libs/enums';
 import { GenerationJobData } from './generation.processor';
+import { GeminiService } from '../ai/gemini.service';
+import { FilesService } from '../files/files.service';
 
 type GenerationFilters = {
 	product_id?: string;
@@ -52,6 +54,8 @@ export class GenerationsService {
 		private readonly generationQueue: Queue<GenerationJobData>,
 
 		private readonly configService: ConfigService,
+		private readonly geminiService: GeminiService,
+		private readonly filesService: FilesService,
 	) {}
 
 	async create(userId: string, dto: CreateGenerationDto): Promise<Generation> {
@@ -579,5 +583,98 @@ export class GenerationsService {
 			userId,
 			status
 		});
+	}
+
+	/**
+	 * Emit generation_done event when all visuals are processed
+	 */
+	emitGenerationDone(generationId: string, userId: string, stats: { completed: number; failed: number; total: number; status: string }): void {
+		this.emitGenerationUpdate(generationId, {
+			type: 'generation_done',
+			userId,
+			completed: stats.completed,
+			failed: stats.failed,
+			total: stats.total,
+			status: stats.status,
+		});
+	}
+
+	/**
+	 * Retry generating a single visual
+	 */
+	async retryVisual(generationId: string, userId: string, visualIndex: number, model?: string): Promise<Generation> {
+		const generation = await this.findOne(generationId, userId);
+
+		if (!generation.visuals || !generation.visuals[visualIndex]) {
+			throw new BadRequestException(`Visual at index ${visualIndex} not found`);
+		}
+
+		const visual = generation.visuals[visualIndex];
+		const prompt = visual.prompt || this.extractPrompts([visual])[0];
+
+		if (!prompt) {
+			throw new BadRequestException(`No prompt found for visual at index ${visualIndex}`);
+		}
+
+		this.logger.log(`🔄 Retrying visual ${visualIndex} for generation ${generationId}`);
+
+		// Emit processing event
+		this.emitVisualProcessing(generationId, userId, visualIndex, visual.type || `visual_${visualIndex}`);
+
+		try {
+			// Generate image
+			const result = await this.geminiService.generateImage(prompt, model);
+
+			// Save to storage
+			let imageUrl: string | null = null;
+			if (result.data) {
+				try {
+					const storedFile = await this.filesService.storeBase64Image(result.data, result.mimeType);
+					imageUrl = storedFile.url;
+					this.logger.log(`💾 Saved retry image to: ${imageUrl}`);
+				} catch (fileError: any) {
+					this.logger.error(`❌ Failed to save retry image: ${fileError.message}`);
+					throw fileError;
+				}
+			}
+
+			// Update visual
+			generation.visuals[visualIndex] = {
+				...visual,
+				prompt,
+				mimeType: result.mimeType,
+				data: result.data, // Keep base64 for backup
+				text: result.text,
+				status: 'completed',
+				image_url: imageUrl,
+				generated_at: new Date().toISOString(),
+				error: undefined, // Clear any previous error
+			};
+
+			await this.generationsRepository.save(generation);
+
+			// Emit completion event
+			this.emitVisualCompleted(generationId, userId, visualIndex, generation.visuals[visualIndex]);
+
+			this.logger.log(`✅ Successfully retried visual ${visualIndex} for generation ${generationId}`);
+
+			return generation;
+		} catch (error: any) {
+			this.logger.error(`❌ Retry failed for visual ${visualIndex}: ${error.message}`);
+
+			// Mark as failed
+			generation.visuals[visualIndex] = {
+				...visual,
+				status: 'failed',
+				error: error?.message || 'Unknown error',
+			};
+
+			await this.generationsRepository.save(generation);
+
+			// Emit failure event
+			this.emitVisualFailed(generationId, userId, visualIndex, error?.message || 'Unknown error');
+
+			throw error;
+		}
 	}
 }

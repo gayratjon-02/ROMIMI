@@ -161,26 +161,41 @@ export class GenerationProcessor {
 			this.logger.log(`🏁 All parallel image generations finished for ${generationId}`);
 			
 			const allCompleted = visuals.every((v) => v.status === 'completed');
+			const allFailed = visuals.every((v) => v.status === 'failed');
 			const anyFailed = visuals.some((v) => v.status === 'failed');
 			const completedCount = visuals.filter((v) => v.status === 'completed').length;
 			const failedCount = visuals.filter((v) => v.status === 'failed').length;
 
 			this.logger.log(`📊 Final results: ${completedCount} completed, ${failedCount} failed out of ${visuals.length} total`);
 
-			if (allCompleted) {
+			// Status logic per spec:
+			// if all failed → failed
+			// if partial → completed (partial success is still completion)
+			// if all success → completed
+			if (allFailed) {
+				generation.status = GenerationStatus.FAILED;
+				this.logger.error(`❌ Generation ${generationId} failed - all ${visuals.length} images failed`);
+				this.generationsService.emitGenerationCompleted(generationId, generation.user_id, GenerationStatus.FAILED);
+			} else if (allCompleted) {
 				generation.status = GenerationStatus.COMPLETED;
 				generation.completed_at = new Date();
 				this.logger.log(`🎉 Generation ${generationId} completed successfully - all ${visuals.length} images generated!`);
-				
-				// Emit final completion event
 				this.generationsService.emitGenerationCompleted(generationId, generation.user_id, GenerationStatus.COMPLETED);
 			} else if (anyFailed) {
-				generation.status = completedCount > 0 ? GenerationStatus.COMPLETED : GenerationStatus.FAILED;
-				this.logger.error(`⚠️ Generation ${generationId} completed with ${failedCount} failures, ${completedCount} succeeded`);
-				
-				// Emit completion event (partial success is still completion)
-				this.generationsService.emitGenerationCompleted(generationId, generation.user_id, generation.status);
+				// Partial success - mark as completed but with errors
+				generation.status = GenerationStatus.COMPLETED;
+				generation.completed_at = new Date();
+				this.logger.warn(`⚠️ Generation ${generationId} completed with ${failedCount} failures, ${completedCount} succeeded`);
+				this.generationsService.emitGenerationCompleted(generationId, generation.user_id, GenerationStatus.COMPLETED);
 			}
+
+			// Emit generation_done event when all visuals are processed (regardless of success/failure)
+			this.generationsService.emitGenerationDone(generationId, generation.user_id, {
+				completed: completedCount,
+				failed: failedCount,
+				total: visuals.length,
+				status: generation.status,
+			});
 
 			await this.generationsRepository.save(generation);
 		} catch (error) {
