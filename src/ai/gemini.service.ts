@@ -32,26 +32,47 @@ export class GeminiService {
 				this.logger.log(`Resolution: ${resolution}`);
 			}
 
-			// Build enhanced prompt with aspect ratio and resolution instructions
-			let enhancedPrompt = `Generate a high-quality, professional image: ${prompt}`;
-			
-			if (aspectRatio) {
-				// Add aspect ratio instruction to prompt
+			// 🎨 Build enhanced prompt with EXPLICIT aspect ratio and resolution instructions
+			let enhancedPrompt = `Create a photorealistic, high-quality commercial product image: ${prompt}`;
+
+			// 📐 Exact dimension mapping for precise aspect ratio and resolution control
+			let dimensions = '';
+			if (aspectRatio && resolution) {
+				const dimensionMap: Record<string, Record<string, string>> = {
+					'4:5': {
+						'2K': 'Image dimensions: 1638x2048 pixels (4:5 portrait ratio, 2K resolution)',
+						'4K': 'Image dimensions: 3072x3840 pixels (4:5 portrait ratio, 4K resolution)',
+					},
+					'1:1': {
+						'2K': 'Image dimensions: 2048x2048 pixels (1:1 square ratio, 2K resolution)',
+						'4K': 'Image dimensions: 3840x3840 pixels (1:1 square ratio, 4K resolution)',
+					},
+					'9:16': {
+						'2K': 'Image dimensions: 1152x2048 pixels (9:16 vertical ratio, 2K resolution)',
+						'4K': 'Image dimensions: 2160x3840 pixels (9:16 vertical ratio, 4K resolution)',
+					},
+				};
+
+				dimensions = dimensionMap[aspectRatio]?.[resolution] || `${aspectRatio} aspect ratio, ${resolution} resolution`;
+			} else if (aspectRatio) {
+				// Fallback if only aspect ratio is provided
 				const aspectRatioMap: Record<string, string> = {
 					'4:5': 'portrait orientation, 4:5 aspect ratio (vertical, taller than wide)',
 					'1:1': 'square format, 1:1 aspect ratio (equal width and height)',
 					'9:16': 'vertical/portrait format, 9:16 aspect ratio (very tall, mobile/Instagram story format)',
 				};
-				enhancedPrompt += `. Image format: ${aspectRatioMap[aspectRatio] || `aspect ratio ${aspectRatio}`}`;
+				dimensions = aspectRatioMap[aspectRatio] || `aspect ratio ${aspectRatio}`;
+			} else if (resolution) {
+				// Fallback if only resolution is provided
+				const resolutionMap: Record<string, string> = {
+					'2K': '2K resolution (high quality)',
+					'4K': '4K resolution (ultra high quality, maximum detail)',
+				};
+				dimensions = resolutionMap[resolution] || `Resolution: ${resolution}`;
 			}
 
-			if (resolution) {
-				// Add resolution instruction to prompt
-				const resolutionMap: Record<string, string> = {
-					'2K': '2K resolution (2048x1152 or equivalent high quality)',
-					'4K': '4K resolution (3840x2160 or equivalent ultra high quality, maximum detail)',
-				};
-				enhancedPrompt += `. ${resolutionMap[resolution] || `Resolution: ${resolution}`}`;
+			if (dimensions) {
+				enhancedPrompt = `${enhancedPrompt}\n\nIMPORTANT TECHNICAL SPECS:\n${dimensions}. Ultra high quality, professional photography, sharp details, perfect lighting.`;
 			}
 
 			const result = await model.generateContent({
