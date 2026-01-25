@@ -134,4 +134,19 @@ export class GenerationsController {
 
 		return new StreamableFile(archive);
 	}
+
+	@Post(':generationId/visual/:index/retry')
+	async retryVisual(
+		@Param('generationId') generationId: string,
+		@Param('index') index: string,
+		@CurrentUser() user: User,
+		@Body() dto?: { model?: string },
+	): Promise<Generation> {
+		const visualIndex = parseInt(index, 10);
+		if (isNaN(visualIndex) || visualIndex < 0) {
+			throw new BadRequestException('Invalid visual index');
+		}
+
+		return this.generationsService.retryVisual(generationId, user.id, visualIndex, dto?.model);
+	}
 }
