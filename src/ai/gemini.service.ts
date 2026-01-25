@@ -75,6 +75,8 @@ export class GeminiService {
 				enhancedPrompt = `${enhancedPrompt}\n\nIMPORTANT TECHNICAL SPECS:\n${dimensions}. Ultra high quality, professional photography, sharp details, perfect lighting.`;
 			}
 
+			// 🚀 CRITICAL: Use generateContentStream for better image generation support
+			// Try to get image data from response
 			const result = await model.generateContent({
 				contents: [
 					{
@@ -90,31 +92,33 @@ export class GeminiService {
 					temperature: 0.7,
 					topK: 40,
 					topP: 0.95,
-					maxOutputTokens: 1024,
+					maxOutputTokens: 8192, // Increased for image generation
 				},
 			});
 
 			const response = result.response;
 
-			// Check for inline image data
+			// 🚀 CRITICAL: Check for inline image data FIRST
 			const inlineData = this.extractInlineData(response);
 
 			if (inlineData?.data) {
-				this.logger.log(`Successfully generated image (${inlineData.mimeType})`);
+				this.logger.log(`✅ Successfully generated image (${inlineData.mimeType}), data length: ${inlineData.data.length}`);
 				return {
 					mimeType: inlineData.mimeType,
 					data: inlineData.data,
 				};
 			}
 
-			// If no image data, return text response
+			// 🚀 CRITICAL: If no image data, log error and throw exception
 			const text = response.text();
-			this.logger.log(`Generated text response: ${text.substring(0, 100)}...`);
-
-			return {
-				mimeType: 'text/plain',
-				text: text,
-			};
+			this.logger.error(`❌ Gemini API returned text instead of image!`);
+			this.logger.error(`Response text: ${text.substring(0, 200)}...`);
+			this.logger.error(`Response candidates:`, JSON.stringify(response.candidates, null, 2));
+			
+			// Throw error instead of returning text
+			throw new InternalServerErrorException(
+				`Gemini API did not generate an image. Response: ${text.substring(0, 100)}`
+			);
 		} catch (error: any) {
 			const errorMessage = error?.response?.error ? JSON.stringify(error.response.error) : error?.message || String(error);
 			this.logger.error(`Gemini generateImage failed: ${errorMessage}`);
@@ -162,14 +166,21 @@ export class GeminiService {
 	private extractInlineData(response: EnhancedGenerateContentResponse): { mimeType: string; data: string } | null {
 		const parts: Part[] = response.candidates?.[0]?.content?.parts || [];
 
-		for (const part of parts) {
+		this.logger.log(`🔍 Extracting inline data from ${parts.length} parts`);
+
+		for (let i = 0; i < parts.length; i++) {
+			const part = parts[i];
+			this.logger.log(`🔍 Part ${i} type:`, (part as any).inlineData ? 'inlineData' : 'text');
+			
 			const inlineData = (part as { inlineData?: { mimeType: string; data: string } }).inlineData;
 
 			if (inlineData?.data) {
+				this.logger.log(`✅ Found inline data: mimeType=${inlineData.mimeType}, dataLength=${inlineData.data.length}`);
 				return inlineData;
 			}
 		}
 
+		this.logger.warn(`⚠️ No inline data found in response parts`);
 		return null;
 	}
 }
