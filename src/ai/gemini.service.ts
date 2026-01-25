@@ -179,6 +179,7 @@ Aspect ratio: ${ratioText}. Resolution: ${resolutionText}.`;
 					}
 				}
 				
+				
 				// Check for thought parts (Gemini 3 Pro uses thinking)
 				if (part.thought) {
 					this.logger.log(`💭 Part ${i} is THOUGHT (thinking process)`);
