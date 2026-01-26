@@ -153,6 +153,10 @@ export class ProductsService {
 			product.manual_overrides = updateProductDto.manual_overrides;
 		}
 
+		if (updateProductDto.generated_images !== undefined) {
+			product.generated_images = updateProductDto.generated_images;
+		}
+
 		return this.productsRepository.save(product);
 	}
 

@@ -29,4 +29,8 @@ export class UpdateProductDto {
 	@IsObject({ message: ValidationMessage.FIELD_INVALID })
 	@IsOptional()
 	manual_overrides?: Record<string, any>;
+
+	@IsObject({ message: ValidationMessage.FIELD_INVALID })
+	@IsOptional()
+	generated_images?: Record<string, string>;
 }

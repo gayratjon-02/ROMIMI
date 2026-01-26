@@ -44,6 +44,10 @@ export class Product {
   @Column({ type: 'jsonb', nullable: true })
   manual_overrides: Record<string, any>;
 
+  // Stores generated image filenames: { duo: 'abc123.jpg', solo: 'def456.jpg', ... }
+  @Column({ type: 'jsonb', nullable: true })
+  generated_images: Record<string, string>;
+
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 

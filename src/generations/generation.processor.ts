@@ -4,6 +4,7 @@ import { Job } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Generation } from '../database/entities/generation.entity';
+import { Product } from '../database/entities/product.entity';
 import { GeminiService } from '../ai/gemini.service';
 import { GenerationStatus } from '../libs/enums';
 import { GenerationsService } from './generations.service';
@@ -23,6 +24,8 @@ export class GenerationProcessor {
 	constructor(
 		@InjectRepository(Generation)
 		private readonly generationsRepository: Repository<Generation>,
+		@InjectRepository(Product)
+		private readonly productsRepository: Repository<Product>,
 		private readonly geminiService: GeminiService,
 		private readonly generationsService: GenerationsService,
 		private readonly filesService: FilesService,
@@ -88,10 +91,12 @@ export class GenerationProcessor {
 					
 					// Save image
 					let imageUrl: string | null = null;
+					let imageFilename: string | null = null;
 					if (result.data) {
 						try {
 							const storedFile = await this.filesService.storeBase64Image(result.data, result.mimeType);
 							imageUrl = storedFile.url;
+							imageFilename = storedFile.filename;
 						} catch (fileError: any) {
 							this.logger.error(`❌ Save failed for ${visualType}: ${fileError.message}`);
 							imageUrl = `data:${result.mimeType};base64,${result.data}`;
@@ -105,6 +110,7 @@ export class GenerationProcessor {
 						mimeType: result.mimeType,
 						status: 'completed',
 						image_url: imageUrl,
+						image_filename: imageFilename,
 						generated_at: new Date().toISOString(),
 					};
 					
@@ -172,6 +178,32 @@ export class GenerationProcessor {
 			this.logger.log(`📊 Generation ${generationId} finished: ${completedCount} completed, ${failedCount} failed`);
 
 			await this.generationsRepository.save(generation);
+
+			// Save generated image filenames to product for quick access later
+			if (generation.product_id && completedCount > 0) {
+				try {
+					const product = await this.productsRepository.findOne({
+						where: { id: generation.product_id },
+					});
+					
+					if (product) {
+						const generatedImages: Record<string, string> = {};
+						for (const visual of visuals) {
+							if (visual.status === 'completed' && visual.image_filename) {
+								generatedImages[visual.type] = visual.image_filename;
+							}
+						}
+						
+						if (Object.keys(generatedImages).length > 0) {
+							product.generated_images = generatedImages;
+							await this.productsRepository.save(product);
+							this.logger.log(`📦 Saved ${Object.keys(generatedImages).length} generated images to product ${product.id}`);
+						}
+					}
+				} catch (err: any) {
+					this.logger.warn(`⚠️ Failed to save generated images to product: ${err.message}`);
+				}
+			}
 		} catch (error) {
 			this.logger.error(`Generation ${generationId} failed: ${error.message}`, error.stack);
 			
