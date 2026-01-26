@@ -47,12 +47,16 @@ export class GenerationProcessor {
 				where: { id: generationId },
 			});
 
-			if (!generation) {
-				throw new Error(`Generation ${generationId} not found`);
-			}
+		if (!generation) {
+			throw new Error(`Generation ${generationId} not found`);
+		}
 
-			generation.status = GenerationStatus.PROCESSING;
-			await this.generationsRepository.save(generation);
+		// Set started_at when generation begins processing
+		if (!generation.started_at) {
+			generation.started_at = new Date();
+		}
+		generation.status = GenerationStatus.PROCESSING;
+		await this.generationsRepository.save(generation);
 
 			// Initialize visuals array with structure
 			// Use provided visualTypes if available, otherwise fall back to index-based
@@ -122,7 +126,10 @@ export class GenerationProcessor {
 					
 					// Update progress
 					const completed = visuals.filter(v => v.status === 'completed' || v.status === 'failed').length;
-					job.progress(Math.round((completed / prompts.length) * 100));
+					generation.progress_percent = Math.round((completed / prompts.length) * 100);
+					generation.completed_visuals_count = visuals.filter(v => v.status === 'completed').length;
+					await this.generationsRepository.save(generation);
+					job.progress(generation.progress_percent);
 					
 					return { success: true, index: i };
 				} catch (error: any) {
@@ -174,6 +181,10 @@ export class GenerationProcessor {
 				generation.completed_at = new Date();
 				this.logger.warn(`⚠️ Generation ${generationId} completed with ${failedCount} failures, ${completedCount} succeeded`);
 			}
+			
+			// Final progress update
+			generation.progress_percent = 100;
+			generation.completed_visuals_count = completedCount;
 			
 			this.logger.log(`📊 Generation ${generationId} finished: ${completedCount} completed, ${failedCount} failed`);
 

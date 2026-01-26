@@ -220,7 +220,7 @@ export class GenerationsService {
 	/**
 	 * Get generation with all data
 	 */
-	async getWithDetails(generationId: string, userId: string): Promise<Generation> {
+	async getWithDetails(generationId: string, userId: string): Promise<Generation & { elapsed_seconds?: number; estimated_remaining_seconds?: number }> {
 		const generation = await this.generationsRepository.findOne({
 			where: { id: generationId },
 			relations: ['product', 'collection', 'collection.brand'],
@@ -234,7 +234,28 @@ export class GenerationsService {
 			throw new ForbiddenException(PermissionMessage.NOT_OWNER);
 		}
 
-		return generation;
+		// Calculate elapsed and remaining time
+		let elapsedSeconds = 0;
+		let estimatedRemainingSeconds: number | undefined = undefined;
+
+		if (generation.started_at) {
+			const now = new Date();
+			const started = new Date(generation.started_at);
+			elapsedSeconds = Math.floor((now.getTime() - started.getTime()) / 1000);
+
+			// Estimate remaining time based on progress
+			const progress = generation.progress_percent || 0;
+			if (progress > 0 && progress < 100) {
+				const avgTimePerPercent = elapsedSeconds / progress;
+				estimatedRemainingSeconds = Math.ceil(avgTimePerPercent * (100 - progress));
+			}
+		}
+
+		return {
+			...generation,
+			elapsed_seconds: elapsedSeconds,
+			estimated_remaining_seconds: estimatedRemainingSeconds,
+		} as Generation & { elapsed_seconds?: number; estimated_remaining_seconds?: number };
 	}
 
 	async findAll(
@@ -559,6 +580,8 @@ export class GenerationsService {
 		progress: number;
 		completed: number;
 		total: number;
+		elapsed_seconds?: number;
+		estimated_remaining_seconds?: number;
 		visuals: Array<{ index: number; status: string; error?: string }>;
 	}> {
 		const generation = await this.findOne(id, userId);
@@ -567,13 +590,31 @@ export class GenerationsService {
 		const completed = visuals.filter((v: any) => v.status === 'completed').length;
 		const failed = visuals.filter((v: any) => v.status === 'failed').length;
 		const total = visuals.length || 0;
-		const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+		const progress = generation.progress_percent || (total > 0 ? Math.round((completed / total) * 100) : 0);
+
+		// Calculate elapsed and remaining time
+		let elapsedSeconds = 0;
+		let estimatedRemainingSeconds: number | undefined = undefined;
+
+		if (generation.started_at) {
+			const now = new Date();
+			const started = new Date(generation.started_at);
+			elapsedSeconds = Math.floor((now.getTime() - started.getTime()) / 1000);
+
+			// Estimate remaining time based on progress
+			if (progress > 0 && progress < 100) {
+				const avgTimePerPercent = elapsedSeconds / progress;
+				estimatedRemainingSeconds = Math.ceil(avgTimePerPercent * (100 - progress));
+			}
+		}
 
 		return {
 			status: generation.status,
 			progress,
 			completed,
 			total,
+			elapsed_seconds: elapsedSeconds,
+			estimated_remaining_seconds: estimatedRemainingSeconds,
 			visuals: visuals.map((v: any, index: number) => ({
 				index: v.index ?? index,
 				status: v.status || 'pending',
