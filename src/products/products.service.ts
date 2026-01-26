@@ -145,6 +145,14 @@ export class ProductsService {
 			product.reference_images = updateProductDto.reference_images;
 		}
 
+		if (updateProductDto.extracted_variables !== undefined) {
+			product.extracted_variables = updateProductDto.extracted_variables;
+		}
+
+		if (updateProductDto.manual_overrides !== undefined) {
+			product.manual_overrides = updateProductDto.manual_overrides;
+		}
+
 		return this.productsRepository.save(product);
 	}
 
