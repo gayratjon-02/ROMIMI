@@ -18,14 +18,14 @@ export class Generation {
   @Column({ type: 'uuid' })
   product_id: string;
 
-  @ManyToOne(() => Product, (product) => product.generations)
+  @ManyToOne(() => Product, (product) => product.generations, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true })
   collection_id: string;
 
-  @ManyToOne(() => Collection)
+  @ManyToOne(() => Collection, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'collection_id' })
   collection: Collection;
 
