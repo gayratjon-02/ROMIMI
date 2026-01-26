@@ -73,6 +73,9 @@ export class AdRecreation {
 	@CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
 	created_at: Date;
 
+	@Column({ type: 'timestamp', nullable: true })
+	completed_at: Date;
+
 	@UpdateDateColumn({
 		type: 'timestamp',
 		default: () => 'CURRENT_TIMESTAMP',

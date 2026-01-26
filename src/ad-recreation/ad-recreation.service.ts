@@ -44,9 +44,9 @@ export class AdRecreationService {
 		const adRecreation = this.adRecreationRepository.create({
 			competitor_ad_url: dto.competitor_ad_url,
 			brand_brief: dto.brand_brief,
-			brand_references: dto.brand_references,
+			brand_reference_images: dto.brand_references,
 			variations_count: dto.variations_count || 3,
-			status: AdRecreationStatus.UPLOADED,
+			status: AdRecreationStatus.UPLOADED as string,
 			user_id: userId,
 		});
 
@@ -122,7 +122,7 @@ export class AdRecreationService {
 				dto,
 			);
 
-			adRecreation.analysis_result = analysisResult;
+			adRecreation.competitor_analysis = analysisResult;
 			adRecreation.status = AdRecreationStatus.ANALYZED;
 			await this.adRecreationRepository.save(adRecreation);
 
@@ -163,7 +163,7 @@ export class AdRecreationService {
 			// TODO: Implement Gemini image generation
 			// For now, we'll simulate generation with mock data
 			const generatedVariations = await this.performImageGeneration(
-				adRecreation.analysis_result,
+				adRecreation.competitor_analysis,
 				adRecreation.variations_count,
 				dto,
 			);
