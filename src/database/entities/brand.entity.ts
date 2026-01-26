@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   OneToMany,
   JoinColumn,
@@ -28,8 +29,18 @@ export class Brand {
   @Column({ type: 'text', nullable: true })
   brand_brief: string;
 
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  logo_url: string;
+
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
+
+  @UpdateDateColumn({
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+    onUpdate: 'CURRENT_TIMESTAMP',
+  })
+  updated_at: Date;
 
   @OneToMany(() => Collection, (collection) => collection.brand)
   collections: Collection[];
