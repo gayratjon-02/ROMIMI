@@ -31,7 +31,7 @@ export class CollectionsService {
 		private brandsRepository: Repository<Brand>,
 		private readonly claudeService: ClaudeService,
 		private readonly filesService: FilesService,
-	) {}
+	) { }
 
 	async create(
 		userId: string,
@@ -64,7 +64,7 @@ export class CollectionsService {
 		// Ensure uniqueness
 		let uniqueCode = code;
 		let counter = 1;
-		
+
 		while (true) {
 			const existingCollection = await this.collectionsRepository.findOne({
 				where: { code: uniqueCode },
@@ -79,7 +79,7 @@ export class CollectionsService {
 			const uniqueSuffix = Math.random().toString(36).substring(2, 6);
 			uniqueCode = `${code}-${uniqueSuffix}`;
 			counter++;
-			
+
 			// Safety break to prevent infinite loops (though unlikely with random)
 			if (counter > 10) {
 				uniqueCode = `${code}-${Date.now()}`;
@@ -229,6 +229,8 @@ export class CollectionsService {
 
 	/**
 	 * Update DA JSON (user edits)
+	 * Supports upsert behavior: creates new analyzed_da_json if it doesn't exist
+	 * This enables test collections to be auto-repaired during generation flow
 	 */
 	async updateDAJSON(
 		collectionId: string,
@@ -238,12 +240,57 @@ export class CollectionsService {
 	): Promise<{ analyzed_da_json: AnalyzedDAJSON; fixed_elements: FixedElements }> {
 		const collection = await this.findOne(collectionId, userId);
 
+		// UPSERT: If no analyzed_da_json exists, create from updates (or defaults)
 		if (!collection.analyzed_da_json) {
-			throw new BadRequestException('DA must be analyzed first');
-		}
+			if (!updates) {
+				throw new BadRequestException('DA must be analyzed first or updates must be provided');
+			}
+			// Create new analyzed_da_json with defaults for missing fields
+			const defaultDAJSON: AnalyzedDAJSON = {
+				background: {
+					color_hex: '#FFFFFF',
+					color_name: 'White',
+					description: 'Clean white studio background',
+					texture: 'smooth',
+				},
+				props: {
+					items: [],
+					placement: 'minimal',
+					style: 'modern',
+				},
+				mood: 'professional, clean, modern',
+				lighting: {
+					type: 'softbox',
+					temperature: 'neutral',
+					direction: 'front',
+					intensity: 'medium',
+				},
+				composition: {
+					layout: 'centered',
+					poses: 'standard',
+					framing: 'full body',
+				},
+				styling: {
+					bottom: 'dark trousers',
+					feet: 'white sneakers',
+				},
+				camera: {
+					focal_length_mm: 85,
+					aperture: 2.8,
+					focus: 'subject',
+				},
+				quality: 'professional',
+				analyzed_at: new Date().toISOString(),
+			};
+			// Merge updates into defaults
+			collection.analyzed_da_json = { ...defaultDAJSON, ...updates } as AnalyzedDAJSON;
 
-		// Merge updates
-		if (updates) {
+			// Auto-generate fixed_elements if not provided
+			if (!fixedElements) {
+				collection.fixed_elements = this.generateFixedElementsFromDA(collection.analyzed_da_json);
+			}
+		} else if (updates) {
+			// Merge updates into existing analyzed_da_json
 			collection.analyzed_da_json = {
 				...collection.analyzed_da_json,
 				...updates,

@@ -189,6 +189,7 @@ export class ProductsService {
 	/**
 	 * STEP 1: Analyze product images with AI
 	 * ⚠️ HOZIRCHA Gemini ishlatilmoqda (Claude kredit tugagan)
+	 * 🛡️ YANGI: Backend data sanitization qo'shildi
 	 */
 	async analyzeProduct(id: string, userId: string): Promise<AnalyzedProductJSON> {
 		const product = await this.findOne(id, userId);
@@ -205,16 +206,27 @@ export class ProductsService {
 
 		// ⚠️ VAQTINCHA COMMENT - Claude API kredit tugaganligi sababli
 		// Keyinchalik kredit sotib olganda ushbu qatorni uncomment qiling:
-		// const analyzedProductJSON = await this.claudeService.analyzeProduct({
+		// const rawAIResponse = await this.claudeService.analyzeProduct({
 		// 	images,
 		// 	productName: product.name,
 		// });
 
 		// 🆕 HOZIRCHA Gemini ishlatamiz
-		const analyzedProductJSON = await this.geminiService.analyzeProduct({
+		const rawAIResponse = await this.geminiService.analyzeProduct({
 			images,
 			productName: product.name,
 		});
+
+		// ═══════════════════════════════════════════════════════════
+		// 🛡️ CRITICAL: Sanitize AI response BEFORE sending to frontend
+		// ═══════════════════════════════════════════════════════════
+		// This prevents:
+		// 1. [object Object] errors from nested logo fields
+		// 2. "Unknown" spam in color/material fields
+		// 3. Crashes from malformed AI JSON
+		// ═══════════════════════════════════════════════════════════
+		const { normalizeProductData } = await import('./utils/normalize-product-data.util');
+		const analyzedProductJSON = normalizeProductData(rawAIResponse);
 
 		// Save to product
 		product.analyzed_product_json = analyzedProductJSON;
