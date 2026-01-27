@@ -141,10 +141,10 @@ const DA_TEMPLATES: DATemplate[] = [
 @Controller('collections')
 @UseGuards(JwtAuthGuard)
 export class CollectionsController {
-	constructor(private readonly collectionsService: CollectionsService) {}
+	constructor(private readonly collectionsService: CollectionsService) { }
 
 	// ==================== PUBLIC ENDPOINTS (Decorators/DA Templates) ====================
-	
+
 	/**
 	 * Get all DA Templates (Decorators) - PUBLIC endpoint
 	 * These are predefined studio environments for product visual generation
@@ -169,6 +169,14 @@ export class CollectionsController {
 	@Get('getAllCollections')
 	async getAllCollections(@CurrentUser() user: User): Promise<Collection[]> {
 		return this.collectionsService.findAll(user.id);
+	}
+
+	@Get('getCollectionsByBrand/:brandId')
+	async getCollectionsByBrand(
+		@Param('brandId') brandId: string,
+		@CurrentUser() user: User,
+	): Promise<Collection[]> {
+		return this.collectionsService.findByBrand(brandId, user.id);
 	}
 
 	@Post('createCollection')
