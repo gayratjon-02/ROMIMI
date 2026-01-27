@@ -9,7 +9,10 @@ import { Repository } from 'typeorm';
 import { Product } from '../database/entities/product.entity';
 import { Collection } from '../database/entities/collection.entity';
 import { Generation } from '../database/entities/generation.entity';
-import { ClaudeService } from '../ai/claude.service';
+// ⚠️ VAQTINCHA COMMENT - Claude API kredit tugaganligi sababli
+// import { ClaudeService } from '../ai/claude.service';
+// 🆕 HOZIRCHA Gemini ishlatamiz
+import { GeminiService } from '../ai/gemini.service';
 import { CreateProductDto, UpdateProductDto } from '../libs/dto';
 import {
 	NotFoundMessage,
@@ -29,7 +32,10 @@ export class ProductsService {
 		private collectionsRepository: Repository<Collection>,
 		@InjectRepository(Generation)
 		private generationsRepository: Repository<Generation>,
-		private readonly claudeService: ClaudeService,
+		// ⚠️ VAQTINCHA COMMENT - Claude API kredit tugaganligi sababli
+		// private readonly claudeService: ClaudeService,
+		// 🆕 HOZIRCHA Gemini ishlatamiz
+		private readonly geminiService: GeminiService,
 	) {}
 
 	async create(userId: string, createProductDto: CreateProductDto): Promise<Product> {
@@ -181,7 +187,8 @@ export class ProductsService {
 	}
 
 	/**
-	 * STEP 1: Analyze product images with Claude
+	 * STEP 1: Analyze product images with AI
+	 * ⚠️ HOZIRCHA Gemini ishlatilmoqda (Claude kredit tugagan)
 	 */
 	async analyzeProduct(id: string, userId: string): Promise<AnalyzedProductJSON> {
 		const product = await this.findOne(id, userId);
@@ -196,8 +203,15 @@ export class ProductsService {
 			throw new BadRequestException(FileMessage.FILE_NOT_FOUND);
 		}
 
-		// Analyze with Claude
-		const analyzedProductJSON = await this.claudeService.analyzeProduct({
+		// ⚠️ VAQTINCHA COMMENT - Claude API kredit tugaganligi sababli
+		// Keyinchalik kredit sotib olganda ushbu qatorni uncomment qiling:
+		// const analyzedProductJSON = await this.claudeService.analyzeProduct({
+		// 	images,
+		// 	productName: product.name,
+		// });
+
+		// 🆕 HOZIRCHA Gemini ishlatamiz
+		const analyzedProductJSON = await this.geminiService.analyzeProduct({
 			images,
 			productName: product.name,
 		});
@@ -308,6 +322,9 @@ export class ProductsService {
 		return { message: 'Product deleted successfully' };
 	}
 
+	// ⚠️ VAQTINCHA COMMENT - Claude API kredit tugaganligi sababli
+	// Bu metod ClaudeService ning generatePrompts metodidan foydalanadi
+	// Gemini da bu metod yo'q, keyinchalik implement qilinishi kerak
 	async analyzeImages(
 		images: string[],
 		productName?: string,
@@ -317,21 +334,30 @@ export class ProductsService {
 			throw new BadRequestException(FileMessage.FILE_NOT_FOUND);
 		}
 
-		const extractedVariables = await this.claudeService.analyzeProduct({
+		// ⚠️ VAQTINCHA COMMENT - Claude API kredit tugaganligi sababli
+		// const extractedVariables = await this.claudeService.analyzeProduct({
+		// 	images,
+		// 	productName,
+		// 	brandBrief,
+		// });
+
+		// const prompts = await this.claudeService.generatePrompts({
+		// 	productName,
+		// 	brandBrief,
+		// 	extractedVariables,
+		// 	count: 1,
+		// });
+
+		// 🆕 HOZIRCHA Gemini ishlatamiz (faqat analyzeProduct)
+		const extractedVariables = await this.geminiService.analyzeProduct({
 			images,
 			productName,
-			brandBrief,
 		});
 
-		const prompts = await this.claudeService.generatePrompts({
-			productName,
-			brandBrief,
-			extractedVariables,
-			count: 1,
-		});
-
+		// TODO: Gemini uchun generatePrompts metodini implement qilish kerak
+		// Hozircha empty prompt qaytaramiz
 		return {
-			prompt: prompts[0] || '',
+			prompt: '', // TODO: implement prompt generation
 			extracted_variables: extractedVariables,
 		};
 	}

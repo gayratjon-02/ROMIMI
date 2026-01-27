@@ -1,8 +1,11 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
-import { AIMessage } from '../libs/enums';
+import { AIMessage, FileMessage } from '../libs/enums';
 import { GEMINI_MODEL, GeminiImageResult } from '../libs/config';
+import { AnalyzedProductJSON } from '../common/interfaces/product-json.interface';
+import { PRODUCT_ANALYSIS_PROMPT } from './prompts/product-analysis.prompt';
+import * as fs from 'fs';
 
 // Custom error types for better error handling
 export class GeminiTimeoutError extends Error {
@@ -379,6 +382,180 @@ Aspect ratio: ${ratioText}. Resolution: ${resolutionText}.`;
 	}
 
 	/**
+	 * 🆕 Analyze product images using Gemini
+	 * Returns structured JSON with product details
+	 */
+	async analyzeProduct(input: { images: string[]; productName?: string }): Promise<AnalyzedProductJSON> {
+		if (!input.images || input.images.length === 0) {
+			throw new BadRequestException(FileMessage.FILE_NOT_FOUND);
+		}
+
+		this.logger.log(`🔍 Analyzing product with ${input.images.length} images`);
+
+		const client = this.getClient();
+
+		// Build prompt
+		let promptText = PRODUCT_ANALYSIS_PROMPT;
+		if (input.productName) {
+			promptText += `\n\nProduct name: ${input.productName}`;
+		}
+
+		// Build image parts
+		const imageParts = await this.buildImageParts(input.images);
+
+		try {
+			// Generate content with text + images
+			const response = await client.models.generateContent({
+				model: this.MODEL,
+				contents: [
+					{
+						role: 'user',
+						parts: [
+							{ text: promptText },
+							...imageParts
+						]
+					}
+				]
+			});
+
+			// Extract text response
+			const candidate = response.candidates?.[0];
+			if (!candidate || !candidate.content?.parts) {
+				throw new InternalServerErrorException('No response from Gemini');
+			}
+
+			let textResponse = '';
+			for (const part of candidate.content.parts) {
+				if ((part as any).text) {
+					textResponse += (part as any).text;
+				}
+			}
+
+			// Parse JSON from response
+			const parsed = this.parseJson(textResponse);
+			if (!parsed) {
+				this.logger.error('Failed to parse product analysis JSON', { textResponse });
+				throw new InternalServerErrorException('Failed to parse product analysis');
+			}
+
+			// Add analyzed_at timestamp
+			const result: AnalyzedProductJSON = {
+				...parsed,
+				analyzed_at: new Date().toISOString(),
+			};
+
+			this.logger.log(`✅ Product analysis complete`);
+			return result;
+
+		} catch (error: any) {
+			this.logger.error(`❌ Product analysis failed: ${error.message}`);
+			throw new InternalServerErrorException(`Gemini analysis error: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Build image parts for Gemini API from URLs or file paths
+	 */
+	private async buildImageParts(images: string[]): Promise<any[]> {
+		const parts: any[] = [];
+
+		for (const image of images) {
+			try {
+				let base64Data: string;
+				let mimeType = 'image/jpeg';
+
+				// Check if it's a URL or file path
+				if (image.startsWith('http://') || image.startsWith('https://')) {
+					// Fetch from URL
+					const response = await fetch(image);
+					if (!response.ok) {
+						this.logger.warn(`Failed to fetch image: ${image}`);
+						continue;
+					}
+					const buffer = Buffer.from(await response.arrayBuffer());
+					base64Data = buffer.toString('base64');
+					mimeType = response.headers.get('content-type') || 'image/jpeg';
+				} else if (image.startsWith('data:')) {
+					// Base64 data URL
+					const matches = image.match(/^data:([^;]+);base64,(.+)$/);
+					if (matches) {
+						mimeType = matches[1];
+						base64Data = matches[2];
+					} else {
+						this.logger.warn(`Invalid data URL: ${image}`);
+						continue;
+					}
+				} else {
+					// Local file path
+					if (!fs.existsSync(image)) {
+						this.logger.warn(`File not found: ${image}`);
+						continue;
+					}
+					const buffer = fs.readFileSync(image);
+					base64Data = buffer.toString('base64');
+
+					// Detect mime type from extension
+					if (image.endsWith('.png')) mimeType = 'image/png';
+					else if (image.endsWith('.webp')) mimeType = 'image/webp';
+					else if (image.endsWith('.jpg') || image.endsWith('.jpeg')) mimeType = 'image/jpeg';
+				}
+
+				parts.push({
+					inlineData: {
+						mimeType,
+						data: base64Data
+					}
+				});
+
+				this.logger.log(`✅ Image loaded: ${image.substring(0, 100)}...`);
+
+			} catch (error: any) {
+				this.logger.error(`Failed to load image ${image}: ${error.message}`);
+			}
+		}
+
+		if (parts.length === 0) {
+			throw new BadRequestException('No valid images could be loaded');
+		}
+
+		return parts;
+	}
+
+	/**
+	 * Parse JSON from text response (handles markdown code blocks)
+	 */
+	private parseJson(text: string): any {
+		if (!text) return null;
+
+		try {
+			// Try direct parse first
+			return JSON.parse(text);
+		} catch {
+			// Try to extract JSON from markdown code blocks
+			const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+			if (jsonMatch) {
+				try {
+					return JSON.parse(jsonMatch[1]);
+				} catch {
+					return null;
+				}
+			}
+
+			// Try to find JSON object in text
+			const objectMatch = text.match(/\{[\s\S]*\}/);
+			if (objectMatch) {
+				try {
+					return JSON.parse(objectMatch[0]);
+				} catch {
+					return null;
+				}
+			}
+
+			return null;
+		}
+	}
+
+	/**
 	 * Get or create Gemini client
 	 */
 	private getClient(): GoogleGenAI {
@@ -396,7 +573,7 @@ Aspect ratio: ${ratioText}. Resolution: ${resolutionText}.`;
 		this.logger.log(`✅ Gemini client initialized`);
 		this.logger.log(`   - Model: ${this.MODEL}`);
 		this.logger.log(`   - API Key: ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`);
-		
+
 		this.client = new GoogleGenAI({ apiKey });
 		return this.client;
 	}
