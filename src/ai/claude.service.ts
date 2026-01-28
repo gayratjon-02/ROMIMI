@@ -5,6 +5,7 @@ import type { Messages } from '@anthropic-ai/sdk/resources';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
+import sharp from 'sharp';
 import { AIMessage, FileMessage } from '../libs/enums';
 import { PRODUCT_ANALYSIS_PROMPT } from './prompts/product-analysis.prompt';
 import { DA_ANALYSIS_PROMPT } from './prompts/da-analysis.prompt';
@@ -40,9 +41,9 @@ type ClaudeImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/g
 type ClaudeContentBlock =
 	| { type: 'text'; text: string }
 	| {
-			type: 'image';
-			source: { type: 'base64'; media_type: ClaudeImageMediaType; data: string };
-	  };
+		type: 'image';
+		source: { type: 'base64'; media_type: ClaudeImageMediaType; data: string };
+	};
 
 @Injectable()
 export class ClaudeService {
@@ -52,7 +53,7 @@ export class ClaudeService {
 
 	private readonly model = 'claude-sonnet-4-20250514';
 
-	constructor(private readonly configService: ConfigService) {}
+	constructor(private readonly configService: ConfigService) { }
 
 	async analyzeProduct(input: AnalyzeProductInput): Promise<AnalyzedProductJSON> {
 		if (!input.images?.length) {
@@ -206,7 +207,7 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 			return result;
 		} catch (error) {
 			this.logger.error(`❌ Claude API Error in mergeProductAndDA: ${error.message}`);
-			
+
 			// 🚀 FALLBACK: If API fails (e.g. billing, rate limit), use mock data
 			this.logger.warn('⚠️ FALLBACK FACTIVATED: Returning MOCK merged prompts due to API error');
 			const { MOCK_MERGED_PROMPTS } = await import('./mock-claude.data');
@@ -275,7 +276,7 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 
 		// Try to extract visuals array from response
 		let visuals: any[] = [];
-		
+
 		if (parsed && parsed.visuals && Array.isArray(parsed.visuals)) {
 			visuals = parsed.visuals;
 		} else if (Array.isArray(parsed)) {
@@ -301,7 +302,7 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 		for (let i = 0; i < visualTypes.length; i++) {
 			const type = visualTypes[i];
 			const visual = visuals[i] || {};
-			
+
 			result.push({
 				type,
 				display_name: visual.display_name || this.getDisplayName(type),
@@ -441,7 +442,7 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 	}): Promise<Messages.Message> {
 		const maxRetries = 3;
 		const baseDelay = 2000; // 2 seconds base delay
-		
+
 		for (let attempt = 0; attempt < maxRetries; attempt++) {
 			try {
 				const res = await this.getClient().messages.create({
@@ -459,7 +460,7 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 			} catch (error: any) {
 				const status = error?.status || error?.response?.status;
 				const isOverloaded = status === 529 || status === 503 || status === 429;
-				
+
 				this.logger.warn(`Claude API attempt ${attempt + 1}/${maxRetries} failed:`, {
 					status,
 					message: error?.message,
@@ -595,6 +596,86 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 		return lines.join('\n');
 	}
 
+	/**
+	 * Compress image if it exceeds Claude's 5MB limit
+	 * Target: Keep under 4.5MB to leave safety buffer
+	 */
+	private async compressImageIfNeeded(buffer: Buffer, mediaType: ClaudeImageMediaType): Promise<{ data: string; mediaType: ClaudeImageMediaType }> {
+		const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+		const TARGET_SIZE = 4.5 * 1024 * 1024; // 4.5MB target to leave buffer
+
+		if (buffer.length <= MAX_SIZE) {
+			// No compression needed
+			return {
+				data: buffer.toString('base64'),
+				mediaType,
+			};
+		}
+
+		this.logger.warn(`🗜️ Image size (${(buffer.length / 1024 / 1024).toFixed(2)}MB) exceeds Claude limit (5MB), compressing...`);
+
+		try {
+			let sharpInstance = sharp(buffer);
+
+			// Get image metadata to calculate resize dimensions
+			const metadata = await sharpInstance.metadata();
+			const originalWidth = metadata.width || 2048;
+			const originalHeight = metadata.height || 2048;
+
+			// Start with quality reduction
+			let quality = 85;
+			let maxDimension = 2048; // Start with max dimension
+			let compressed: Buffer;
+
+			// Try progressive quality reduction and resizing
+			for (let attempt = 0; attempt < 5; attempt++) {
+				// Calculate new dimensions while preserving aspect ratio
+				const scale = maxDimension / Math.max(originalWidth, originalHeight);
+				const newWidth = Math.round(originalWidth * scale);
+				const newHeight = Math.round(originalHeight * scale);
+
+				sharpInstance = sharp(buffer)
+					.resize(newWidth, newHeight, {
+						fit: 'inside',
+						withoutEnlargement: true,
+					});
+
+				// Convert to JPEG with quality setting (best compression)
+				compressed = await sharpInstance
+					.jpeg({ quality, progressive: true })
+					.toBuffer();
+
+				this.logger.log(`Attempt ${attempt + 1}: Quality ${quality}, Dimension ${maxDimension}px, Size: ${(compressed.length / 1024 / 1024).toFixed(2)}MB`);
+
+				if (compressed.length <= TARGET_SIZE) {
+					this.logger.log(`✅ Successfully compressed image from ${(buffer.length / 1024 / 1024).toFixed(2)}MB to ${(compressed.length / 1024 / 1024).toFixed(2)}MB`);
+					return {
+						data: compressed.toString('base64'),
+						mediaType: 'image/jpeg', // Always JPEG after compression
+					};
+				}
+
+				// Reduce quality and dimensions for next attempt
+				quality = Math.max(60, quality - 10);
+				maxDimension = Math.max(1024, maxDimension - 256);
+			}
+
+			// If still too large after all attempts, use the last compressed version
+			this.logger.warn(`⚠️ Image still large after compression: ${(compressed.length / 1024 / 1024).toFixed(2)}MB`);
+			return {
+				data: compressed.toString('base64'),
+				mediaType: 'image/jpeg',
+			};
+		} catch (error) {
+			this.logger.error('Failed to compress image:', error);
+			// Fallback to original if compression fails
+			return {
+				data: buffer.toString('base64'),
+				mediaType,
+			};
+		}
+	}
+
 	private async buildImageBlocks(images: string[]): Promise<ClaudeContentBlock[]> {
 		const blocks: ClaudeContentBlock[] = [];
 
@@ -632,22 +713,22 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 		}
 
 		const header = buffer.subarray(0, 4);
-		
+
 		// PNG: 89 50 4E 47
 		if (header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47) {
 			return 'image/png';
 		}
-		
+
 		// JPEG: FF D8 FF
 		if (header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF) {
 			return 'image/jpeg';
 		}
-		
+
 		// GIF: 47 49 46 38 (GIF8)
 		if (header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x38) {
 			return 'image/gif';
 		}
-		
+
 		// WebP: Check for RIFF...WEBP
 		if (buffer.length >= 12) {
 			const riffHeader = buffer.subarray(0, 4).toString();
@@ -656,7 +737,7 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 				return 'image/webp';
 			}
 		}
-		
+
 		// Default to JPEG if unknown
 		return 'image/jpeg';
 	}
@@ -674,18 +755,19 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 
 		const arrayBuffer = await response.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
-		
+
 		// Detect format from buffer (more reliable than content-type header)
 		const detectedType = this.detectImageFormat(buffer);
 		const contentType = response.headers.get('content-type');
 		const headerType = contentType ? this.normalizeMediaType(contentType.split(';')[0]) : null;
-		
+
 		// Use detected type if header type doesn't match or is missing
 		const mediaType = headerType && headerType === detectedType ? headerType : detectedType;
-		
+
 		this.logger.log(`Image format detected: ${mediaType} (header: ${contentType}, detected: ${detectedType})`);
 
-		return { data: buffer.toString('base64'), mediaType };
+		// 🗜️ Compress if needed before returning
+		return this.compressImageIfNeeded(buffer, mediaType);
 	}
 
 	private async readLocalImage(imagePath: string): Promise<{ data: string; mediaType: ClaudeImageMediaType }> {
@@ -711,18 +793,16 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 		// Detect format from buffer (more reliable than file extension)
 		const detectedType = this.detectImageFormat(buffer);
 		const guessedType = this.guessMimeType(existing);
-		
+
 		// Use detected type if it's valid, otherwise fall back to guessed type
-		const mediaType = detectedType !== 'image/jpeg' || guessedType === 'image/jpeg' 
-			? detectedType 
+		const mediaType = detectedType !== 'image/jpeg' || guessedType === 'image/jpeg'
+			? detectedType
 			: this.normalizeMediaType(guessedType);
 
 		this.logger.log(`Local image format: ${mediaType} (file: ${existing}, detected: ${detectedType}, guessed: ${guessedType})`);
 
-		return {
-			data: buffer.toString('base64'),
-			mediaType,
-		};
+		// 🗜️ Compress if needed before returning
+		return this.compressImageIfNeeded(buffer, mediaType);
 	}
 
 	private parseDataUrl(dataUrl: string): { data: string; mediaType: ClaudeImageMediaType } {

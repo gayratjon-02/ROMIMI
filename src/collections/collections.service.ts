@@ -16,6 +16,7 @@ import {
 } from '../libs/dto';
 import { NotFoundMessage, PermissionMessage, FileMessage } from '../libs/enums';
 import { ClaudeService } from '../ai/claude.service';
+import { GeminiService } from '../ai/gemini.service';
 import { AnalyzedDAJSON, FixedElements } from '../common/interfaces/da-json.interface';
 import { FilesService } from '../files/files.service';
 import slugify from 'slugify';
@@ -30,6 +31,7 @@ export class CollectionsService {
 		@InjectRepository(Brand)
 		private brandsRepository: Repository<Brand>,
 		private readonly claudeService: ClaudeService,
+		private readonly geminiService: GeminiService,
 		private readonly filesService: FilesService,
 	) { }
 
@@ -211,7 +213,7 @@ export class CollectionsService {
 			throw new BadRequestException('DA reference image URL is required');
 		}
 
-		// Analyze with Claude
+		// PRIMARY: Analyze with Claude AI
 		const analyzedDAJSON = await this.claudeService.analyzeDAReference(
 			collection.da_reference_image_url
 		);
