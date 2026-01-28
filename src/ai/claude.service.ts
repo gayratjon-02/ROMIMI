@@ -5,7 +5,8 @@ import type { Messages } from '@anthropic-ai/sdk/resources';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
-import sharp from 'sharp';
+// Sharp requires CommonJS import for compatibility with NestJS
+const sharp = require('sharp');
 import { AIMessage, FileMessage } from '../libs/enums';
 import { PRODUCT_ANALYSIS_PROMPT } from './prompts/product-analysis.prompt';
 import { DA_ANALYSIS_PROMPT } from './prompts/da-analysis.prompt';
