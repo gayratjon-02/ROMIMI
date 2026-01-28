@@ -212,6 +212,22 @@ export class GenerationsService {
 		};
 
 		generation.merged_prompts = updatedPrompts;
+
+		// Create/update visuals array from merged prompts so generation can find them
+		// This fixes the "No visuals found" error
+		const visualTypes = ['duo', 'solo', 'flatlay_front', 'flatlay_back', 'closeup_front', 'closeup_back'] as const;
+		generation.visuals = visualTypes
+			.filter(type => updatedPrompts[type]?.prompt) // Only include types with prompts
+			.map(type => ({
+				type,
+				prompt: updatedPrompts[type].prompt,
+				status: 'pending',
+				url: null,
+				created_at: new Date().toISOString()
+			}));
+
+		this.logger.log(`✅ Created ${generation.visuals.length} visuals from merged_prompts`);
+
 		await this.generationsRepository.save(generation);
 
 		return updatedPrompts;
