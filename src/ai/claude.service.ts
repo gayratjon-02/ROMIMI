@@ -18,7 +18,7 @@ import { MergedPrompts } from '../common/interfaces/merged-prompts.interface';
 import { AnalyzeProductDirectResponse } from '../libs/dto/analyze-product-direct.dto';
 
 type AnalyzeProductDirectInput = {
-	frontImages: string[];
+	frontImages?: string[];
 	backImages?: string[];
 	referenceImages?: string[];
 	productName?: string;
@@ -112,13 +112,14 @@ export class ClaudeService {
 	 * Returns simplified JSON structure for frontend
 	 */
 	async analyzeProductDirect(input: AnalyzeProductDirectInput): Promise<AnalyzeProductDirectResponse> {
-		if (!input.frontImages?.length) {
-			throw new BadRequestException('At least one front image is required');
+		// At least one front OR back image is required
+		if (!input.frontImages?.length && !input.backImages?.length) {
+			throw new BadRequestException('At least one front or back image is required');
 		}
 
 		// Combine all images for analysis
 		const allImages: string[] = [
-			...input.frontImages,
+			...(input.frontImages || []),
 			...(input.backImages || []),
 			...(input.referenceImages || []),
 		];
@@ -127,7 +128,9 @@ export class ClaudeService {
 
 		// Add image context to help Claude understand which images are which
 		promptText += '\n\n--- IMAGE CONTEXT ---';
-		promptText += `\nFront images: ${input.frontImages.length} image(s)`;
+		if (input.frontImages?.length) {
+			promptText += `\nFront images: ${input.frontImages.length} image(s)`;
+		}
 		if (input.backImages?.length) {
 			promptText += `\nBack images: ${input.backImages.length} image(s)`;
 		}

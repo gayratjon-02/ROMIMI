@@ -117,8 +117,9 @@ export class ProductsController {
 		const backImages = files?.back_images || [];
 		const referenceImages = files?.reference_images || [];
 
-		if (!frontImages.length) {
-			throw new BadRequestException('At least one front image is required');
+		// At least one front OR back image is required
+		if (!frontImages.length && !backImages.length) {
+			throw new BadRequestException('At least one front or back image is required');
 		}
 
 		// Store uploaded files and get URLs

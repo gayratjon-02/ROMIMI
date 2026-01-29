@@ -366,12 +366,13 @@ export class ProductsService {
 		referenceImageUrls: string[],
 		productName?: string,
 	): Promise<AnalyzeProductDirectResponse> {
-		if (!frontImageUrls.length) {
-			throw new BadRequestException('At least one front image is required');
+		// At least one front OR back image is required
+		if (!frontImageUrls.length && !backImageUrls.length) {
+			throw new BadRequestException('At least one front or back image is required');
 		}
 
 		return this.claudeService.analyzeProductDirect({
-			frontImages: frontImageUrls,
+			frontImages: frontImageUrls.length ? frontImageUrls : undefined,
 			backImages: backImageUrls.length ? backImageUrls : undefined,
 			referenceImages: referenceImageUrls.length ? referenceImageUrls : undefined,
 			productName,
