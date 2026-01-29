@@ -15,7 +15,7 @@ export class DAService {
 		private daPresetRepository: Repository<DAPreset>,
 		private readonly claudeService: ClaudeService,
 		private readonly filesService: FilesService,
-	) {}
+	) { }
 
 	/**
 	 * Analyze a DA reference image and return structured preset data
@@ -28,7 +28,7 @@ export class DAService {
 	async analyzeReference(
 		imageUrl: string,
 		presetName?: string,
-	): Promise<AnalyzeDAPresetResponse> {
+	): Promise<DAPreset> {
 		if (!imageUrl) {
 			throw new BadRequestException('Reference image is required');
 		}
@@ -36,13 +36,41 @@ export class DAService {
 		this.logger.log('🎨 Starting DA reference analysis...');
 		this.logger.log(`   Image URL: ${imageUrl}`);
 
-		// Call Claude AI to analyze the reference image
+		// 1. Call Claude AI to analyze
 		const result = await this.claudeService.analyzeDAForPreset(imageUrl, presetName);
 
-		this.logger.log('✅ DA Reference Analysis Result:');
-		this.logger.log(JSON.stringify(result, null, 2));
+		this.logger.log('✅ DA Reference Analysis Result - Saving to DB...');
 
-		return result;
+		// 2. Save directly to Database
+		const code = `custom_${Date.now()}`; // Generate unique code
+
+		const preset = this.daPresetRepository.create({
+			name: result.da_name || presetName || 'Custom Analysis',
+			code: code,
+			description: 'Automatically analyzed from reference image',
+			is_default: false,
+			image_url: imageUrl,
+			analyzed_da_json: result as unknown as Record<string, any>, // Save strictly
+
+			// Map strict fields
+			background_type: result.background.type,
+			background_hex: result.background.hex,
+			floor_type: result.floor.type,
+			floor_hex: result.floor.hex,
+			props_left: result.props.left_side,
+			props_right: result.props.right_side,
+			styling_pants: result.styling.pants,
+			styling_footwear: result.styling.footwear,
+			lighting_type: result.lighting.type,
+			lighting_temperature: result.lighting.temperature,
+			mood: result.mood,
+			quality: result.quality
+		});
+
+		const savedPreset = await this.daPresetRepository.save(preset);
+		this.logger.log(`💾 DA Preset saved: ${savedPreset.id} (${savedPreset.name})`);
+
+		return savedPreset;
 	}
 
 	/**

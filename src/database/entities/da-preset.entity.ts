@@ -106,6 +106,19 @@ export class DAPreset {
 	@Column({ type: 'boolean', default: false })
 	is_default: boolean;
 
+	/**
+	 * URL of the uploaded reference image
+	 */
+	@Column({ type: 'varchar', length: 500, nullable: true })
+	image_url: string;
+
+	/**
+	 * Raw JSON analysis from Claude
+	 * Used for transparency and re-hydration
+	 */
+	@Column({ type: 'jsonb', nullable: true })
+	analyzed_da_json: Record<string, any>;
+
 	// ═══════════════════════════════════════════════════════════
 	// BACKGROUND CONFIGURATION
 	// ═══════════════════════════════════════════════════════════

@@ -36,7 +36,7 @@ export class DAController {
 	constructor(
 		private readonly daService: DAService,
 		private readonly filesService: FilesService,
-	) {}
+	) { }
 
 	// ═══════════════════════════════════════════════════════════
 	// 🎨 DA REFERENCE ANALYSIS
@@ -65,8 +65,12 @@ export class DAController {
 		@UploadedFile() imageFile: Express.Multer.File,
 	): Promise<{
 		success: boolean;
-		data: AnalyzeDAPresetResponse;
-		message: string;
+		data: {
+			id: string;
+			name: string;
+			result: AnalyzeDAPresetResponse;
+			imageUrl: string;
+		};
 	}> {
 		if (!imageFile) {
 			throw new BadRequestException('Reference image is required. Upload a photo of the room/scene.');
@@ -75,16 +79,21 @@ export class DAController {
 		// Store the uploaded file and get URL
 		const storedImage = await this.filesService.storeImage(imageFile);
 
-		// Analyze with Claude AI
-		const analysis = await this.daService.analyzeReference(
+		// Analyze AND Save (Persistence handled in Service now)
+		const savedPreset = await this.daService.analyzeReference(
 			storedImage.url,
 			analyzeDto.preset_name,
 		);
 
 		return {
 			success: true,
-			data: analysis,
-			message: 'DA reference analyzed successfully. Use POST /api/da/presets to save as a preset.',
+			data: {
+				id: savedPreset.id,
+				name: savedPreset.name,
+				// Transform back to strict JSON format for frontend
+				result: this.daService.toPresetConfig(savedPreset) as unknown as AnalyzeDAPresetResponse,
+				imageUrl: savedPreset.image_url
+			},
 		};
 	}
 
