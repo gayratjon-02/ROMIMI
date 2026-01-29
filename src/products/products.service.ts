@@ -105,7 +105,11 @@ export class ProductsService {
 			throw new NotFoundException(NotFoundMessage.PRODUCT_NOT_FOUND);
 		}
 
-		if (!product.collection?.brand || product.collection.brand.user_id !== userId) {
+		// Check ownership: Either direct owner (user_id) OR via collection (brand.user_id)
+		const isDirectOwner = product.user_id === userId;
+		const isCollectionOwner = product.collection?.brand?.user_id === userId;
+
+		if (!isDirectOwner && !isCollectionOwner) {
 			throw new ForbiddenException(PermissionMessage.NOT_OWNER);
 		}
 
