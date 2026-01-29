@@ -190,7 +190,6 @@ export class ProductsService {
 
 	/**
 	 * STEP 1: Analyze product images with Claude AI
-	 * 🛡️ Backend data sanitization qo'shildi
 	 */
 	async analyzeProduct(id: string, userId: string): Promise<AnalyzedProductJSON> {
 		const product = await this.findOne(id, userId);
@@ -227,6 +226,8 @@ export class ProductsService {
 		// Initialize final_product_json with analyzed data
 		product.final_product_json = analyzedProductJSON;
 		await this.productsRepository.save(product);
+
+		console.log('Analyzed Product JSON RESULT =>:', analyzedProductJSON);
 
 		return analyzedProductJSON;
 	}
@@ -371,11 +372,20 @@ export class ProductsService {
 			throw new BadRequestException('At least one front or back image is required');
 		}
 
-		return this.claudeService.analyzeProductDirect({
+		console.log('📸 Analyzing product images...');
+		console.log('  Front images:', frontImageUrls.length);
+		console.log('  Back images:', backImageUrls.length);
+		console.log('  Reference images:', referenceImageUrls.length);
+
+		const result = await this.claudeService.analyzeProductDirect({
 			frontImages: frontImageUrls.length ? frontImageUrls : undefined,
 			backImages: backImageUrls.length ? backImageUrls : undefined,
 			referenceImages: referenceImageUrls.length ? referenceImageUrls : undefined,
 			productName,
 		});
+
+		console.log('✅ Product Analysis RESULT =>:', JSON.stringify(result, null, 2));
+
+		return result;
 	}
 }
