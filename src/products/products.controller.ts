@@ -388,6 +388,35 @@ export class ProductsController {
 		};
 	}
 
+	/**
+	 * Update Product Analysis JSON (Persistent Edit)
+	 * PUT /api/products/:id/analysis
+	 * Body: AnalyzeProductDirectResponse (full analysis JSON)
+	 *
+	 * This endpoint allows direct editing of the analyzed_product_json.
+	 * Changes are saved permanently and will be used in prompt generation.
+	 */
+	@Put(':id/analysis')
+	async updateProductAnalysis(
+		@Param('id') id: string,
+		@CurrentUser() user: User,
+		@Body() analysisData: AnalyzeProductDirectResponse,
+	): Promise<{
+		success: boolean;
+		product_id: string;
+		analyzed_product_json: AnalyzeProductDirectResponse;
+		message: string;
+	}> {
+		const product = await this.productsService.updateProductAnalysis(id, user.id, analysisData);
+
+		return {
+			success: true,
+			product_id: id,
+			analyzed_product_json: product.analyzed_product_json as AnalyzeProductDirectResponse,
+			message: 'Product analysis updated successfully',
+		};
+	}
+
 	// ═══════════════════════════════════════════════════════════════════════════
 	// LEGACY ENDPOINTS (for backward compatibility)
 	// ═══════════════════════════════════════════════════════════════════════════

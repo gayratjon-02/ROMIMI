@@ -2,6 +2,7 @@ import {
 	Controller,
 	Get,
 	Post,
+	Put,
 	Body,
 	Param,
 	UseGuards,
@@ -201,6 +202,36 @@ export class DAController {
 			success: true,
 			preset,
 			message: `DA Preset "${preset.name}" saved successfully`,
+		};
+	}
+
+	/**
+	 * Update DA preset analysis
+	 * PUT /api/da/presets/:id/analysis
+	 *
+	 * Allows editing the analyzed DA JSON for a user-created preset.
+	 * System presets (is_default=true) cannot be modified.
+	 *
+	 * Body: AnalyzeDAPresetResponse structure
+	 */
+	@Put('presets/:id/analysis')
+	async updatePresetAnalysis(
+		@CurrentUser() user: User,
+		@Param('id') id: string,
+		@Body() analysisData: AnalyzeDAPresetResponse,
+	): Promise<{
+		success: boolean;
+		preset: DAPreset;
+		config: DAPresetConfig;
+		message: string;
+	}> {
+		const updatedPreset = await this.daService.updatePresetAnalysis(id, analysisData);
+
+		return {
+			success: true,
+			preset: updatedPreset,
+			config: this.daService.toPresetConfig(updatedPreset),
+			message: `DA Preset "${updatedPreset.name}" analysis updated successfully`,
 		};
 	}
 
