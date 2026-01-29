@@ -227,8 +227,6 @@ export class ProductsService {
 		product.final_product_json = analyzedProductJSON;
 		await this.productsRepository.save(product);
 
-		console.log('Analyzed Product JSON RESULT =>:', analyzedProductJSON);
-
 		return analyzedProductJSON;
 	}
 

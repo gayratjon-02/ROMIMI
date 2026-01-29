@@ -22,6 +22,33 @@
 
 ---
 
+## 1.1 API yaratish / o‘zgartirishda Postman hujjati (qoida)
+
+**Har safar API yaratilsa yoki o‘zgartirilsa**, ushbu qo‘llanmaga quyidagi formatda bo‘lim qo‘shiladi:
+
+1. **Request**
+   - **Method** — GET / POST / PUT / PATCH / DELETE
+   - **URL** — `{{baseUrl}}/...` ( Postman env: `baseUrl` )
+   - **Headers** — `Authorization: Bearer {{access_token}}`, `Content-Type` (agar kerak bo‘lsa). FormData uchun Content-Type qo‘yilmasin.
+   - **Body** — `none` / `form-data` (file + text) / `raw JSON` — aniq kalitlar va qiymatlar ko‘rsatiladi.
+
+2. **Postmanda qanday test qilish**
+   - Qadam-baqadam: **Body** tab → **form-data** yoki **raw** tanlash, kalitlarni kiritish, fayllarni **File** qilib yuklash.
+   - Kerak bo‘lsa: **Pre-request Script** yoki **Tests** da `pm.environment.set(...)` bilan `product_id`, `collection_id` va hokazo saqlash.
+
+3. **Kutiladigan javob**
+   - **Muvaffaqiyat:** status code (200, 201, ...) va **aniq JSON** struktura (misol).
+   - **Xato:** 400, 401, 403, 404, 422 va hokazo — **aniq `message`** va ixtiyoriy `error`, `statusCode`.
+
+4. **DB ta’siri**
+   - Qaysi jadvalga qanday yoziladi / yangilanadi / o‘chiriladi — qisqacha.
+
+5. **Postman:** kerakli `_id` larni saqlash — **Collection** / **Environment** da keyingi so‘rovlar uchun.
+
+Har bir yangi yoki o‘zgargan endpoint uchun yuqoridagi struktura saqlanadi. Misol: **3.8 POST `/api/products`** (batafsil).
+
+---
+
 ## 2. Barcha API ro‘yxati
 
 ### 2.1 App (Public)
@@ -325,41 +352,109 @@
 ### 3.8 POST `/api/products` — Product yaratish (JWT, FormData)
 
 **Request:**
-- Method: `POST`
-- URL: `{{baseUrl}}/products`
-- Headers: `Authorization: Bearer {{access_token}}`. **Content-Type qo‘ymang** — Postman `multipart/form-data` ni o‘zi qo‘yadi.
-- Body: **form-data**
-  - `name`: `Test Product`
-  - `collection_id`: `{{collection_id}}`
-  - `front_image`: file (rusum)
-  - `back_image`: file (ixtiyoriy)
-  - `reference_images`: file(s) (ixtiyoriy, bir nechta bo‘lishi mumkin)
+- **Method:** `POST`
+- **URL:** `{{baseUrl}}/products`
+- **Headers:** `Authorization: Bearer {{access_token}}`. **Content-Type qo‘ymang** — Postman `multipart/form-data` ni avtomatik qo‘yadi.
+- **Body:** **form-data** (none emas, raw emas).
 
-**Kutiladigan javob (201):**
+| Key | Type | Required | Qayd |
+|-----|------|----------|------|
+| `name` | Text | ✅ | Mahsulot nomi, max 255 belgi. Masalan: `Polo Bleu Ardoise`, `Zip Tracksuit Forest Green`. |
+| `collection_id` | Text | ✅ | Collection UUID. Avval `POST /api/collections/createCollection` orqali olingan `id`. |
+| `front_image` | File | ✅ | Old packshot (oldingi ko‘rinish). **Majburiy.** Rasm fayl (jpg, png, …). |
+| `back_image` | File | ❌ | Orqa packshot. Ixtiyoriy. |
+| `reference_images` | File | ❌ | Qo‘shimcha referens rasmlar (logolar, detallar). Ixtiyoriy, **maksimal 12 ta**. |
+
+---
+
+#### Postmanda qanday test qilish (qadam-baqadam)
+
+1. **Request yaratish**
+   - Postman da yangi request: **Method** = `POST`, **URL** = `{{baseUrl}}/products`.
+   - **Authorization** tab: Type = **Bearer Token**, Token = `{{access_token}}`.
+
+2. **Body ni to‘ldirish**
+   - **Body** tab → **form-data** tanlang.
+   - Quyidagi qatorlarni qo‘shing:
+
+     | KEY | TYPE | VALUE |
+     |-----|------|--------|
+     | `name` | Text | `Test Product` (yoki ixtiyoriy nom) |
+     | `collection_id` | Text | `{{collection_id}}` yoki haqiqiy collection UUID |
+     | `front_image` | File | **Select Files** — bitta rasm tanlang (front packshot) |
+     | `back_image` | File | (ixtiyoriy) Orqa rasm |
+     | `reference_images` | File | (ixtiyoriy) 1–12 ta rasm — bir xil key da bir nechta file qo‘shish mumkin emas; har biri uchun alohida `reference_images` qator qo‘shib, **File** tanlang. |
+
+   - **Eslatma:** `reference_images` uchun ba’zi serverlar `reference_images[]` yoki bitta key ga bir nechta fayl qabul qiladi. Bizda hozircha bitta `reference_images` key bo‘yicha **bitta** fayl yuboriladi; ko‘p fayl kerak bo‘lsa, key ni takrorlash (reference_images, reference_images, …) yoki backend konfigiga qarab tekshirish kerak.  
+   - Hozirgi backend **FileFieldsInterceptor** da `reference_images` uchun `maxCount: 12` — bir xil key bo‘yicha 12 gacha file yuborish mumkin (multer bildirilgan bo‘lsa). Postman **form-data** da bir key ga bir nechta file qo‘shish qisqa: har biri uchun key `reference_images` qoldirib, har birida bitta **File** tanlash.
+
+3. **Yuborish**
+   - **Send** bosing.
+
+4. **Javobni tekshirish**
+   - **201 Created** — Product yaratildi. Body da `id`, `name`, `front_image_url`, `collection_id` va hokazo keladi.
+   - **400** — front_image yo‘q, yoki validatsiya xatosi (nom, collection_id).
+   - **401** — token yo‘q / noto‘g‘ri.
+   - **403** — collection sizga tegishli emas.
+   - **404** — collection topilmadi.
+
+5. **Postman Environment**
+   - **Tests** yoki **Pre-request** da:  
+     `pm.environment.set("product_id", pm.response.json().id);`  
+   - Keyingi so‘rovlar uchun `{{product_id}}` ishlatiladi.
+
+---
+
+#### Kutiladigan javob
+
+**Muvaffaqiyat (201 Created):**
+
 ```json
 {
-  "id": "product-uuid",
-  "user_id": "user-uuid",
-  "collection_id": "collection-uuid",
-  "brand_id": null,
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_id": "user-uuid-...",
+  "collection_id": "collection-uuid-...",
+  "brand_id": "brand-uuid-...",
   "name": "Test Product",
-  "front_image_url": "/uploads/xxx.jpg",
-  "back_image_url": "/uploads/yyy.jpg",
-  "reference_images": ["/uploads/zzz.jpg"],
+  "front_image_url": "http://localhost:5031/uploads/abc123-front.jpg",
+  "back_image_url": "http://localhost:5031/uploads/abc123-back.jpg",
+  "reference_images": [
+    "http://localhost:5031/uploads/abc123-ref1.jpg",
+    "http://localhost:5031/uploads/abc123-ref2.jpg"
+  ],
   "analyzed_product_json": null,
-  "extracted_variables": null,
   "manual_product_overrides": null,
-  "manual_overrides": null,
   "final_product_json": null,
+  "extracted_variables": null,
+  "manual_overrides": null,
   "generated_images": null,
-  "created_at": "...",
-  "updated_at": "..."
+  "created_at": "2026-01-28T12:00:00.000Z",
+  "updated_at": "2026-01-28T12:00:00.000Z"
 }
 ```
 
-**DB:** `products` jadvaliga yangi qator. Rasmlar `uploads` papkasiga saqlanadi, URL lar product da.
+- `front_image_url` — doim to‘ldirilgan (front majburiy).
+- `back_image_url`, `reference_images` — ixtiyoriy; bo‘lmasa `null` yoki `[]`.
+- `analyzed_product_json`, `final_product_json` — tahlil qilinmaguncha `null`. Tahlil: `POST /api/products/{{product_id}}/analyze`.
 
-**Postman:** `product_id` ni saqlang.
+---
+
+**Xato javoblari:**
+
+| Status | Sabab | Javob (example) |
+|--------|--------|------------------|
+| **400** | Front image yuborilmagan | `{ "statusCode": 400, "message": "Front image is required. Upload front packshot (product front view)." }` |
+| **400** | Validatsiya (nom bo‘sh, collection_id noto‘g‘ri, …) | `{ "statusCode": 400, "message": "Validation failed", "errors": [...] }` |
+| **401** | Token yo‘q / expired | `{ "statusCode": 401, "message": "Unauthorized" }` |
+| **403** | Collection sizga tegishli emas | `{ "statusCode": 403, "message": "You do not have permission to access this resource" }` |
+| **404** | Collection topilmadi | `{ "statusCode": 404, "message": "Collection not found" }` |
+
+---
+
+**DB ta’siri:**  
+`products` jadvaliga yangi qator qo‘shiladi. Rasmlar `uploads` (yoki S3) ga yoziladi; `front_image_url`, `back_image_url`, `reference_images` product ga saqlanadi. Tahlil **qilinmaydi** — keyin `POST /api/products/{{product_id}}/analyze` chaqiriladi.
+
+**Postman:** `product_id` ni saqlang (`pm.environment.set("product_id", ...)`) — Analyze, updateProductJson, Generation va boshqa so‘rovlar uchun.
 
 ---
 

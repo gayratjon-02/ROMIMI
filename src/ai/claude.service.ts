@@ -170,7 +170,7 @@ export class ClaudeService {
 
 		const response = await this.createMessage({
 			content,
-			max_tokens: 3000,
+			max_tokens: 4000,
 		});
 
 		const text = this.extractText(response.content);
