@@ -236,8 +236,8 @@ export class GenerationsService {
 				});
 			}
 
-			// Save prompts to generation
-			generation.merged_prompts = generatedPrompts;
+			// Save prompts to generation (only the prompts field, not the wrapper)
+			generation.merged_prompts = generatedPrompts.prompts;
 			generation.current_step = 'generating_images';
 			generation.progress_percent = 10;
 			await this.generationsRepository.save(generation);
