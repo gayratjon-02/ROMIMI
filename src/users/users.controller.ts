@@ -34,14 +34,6 @@ export class UsersController {
 		return this.usersService.update(user.id, updateUserDto);
 	}
 
-	@Post('updateSettings')
-	async updateSettings(
-		@CurrentUser() user: User,
-		@Body() updateUserDto: UpdateUserDto,
-	): Promise<Omit<User, 'password_hash'>> {
-		return this.usersService.update(user.id, updateUserDto);
-	}
-
 	@Post('updateApiKey')
 	async updateApiKey(
 		@CurrentUser() user: User,

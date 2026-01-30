@@ -54,29 +54,52 @@ export class UsersService {
 	}
 
 	async getSettings(id: string): Promise<Partial<User>> {
-		const user = await this.usersRepository.findOne({
-			where: { id },
-			select: [
-				'id',
-				'email',
-				'name',
-				'brand_brief',
-				'api_key_openai',
-				'api_key_anthropic',
-				'api_key_gemini',
-				'claude_model',
-				'gemini_model',
-				'language',
-				'theme',
-				'notifications_enabled',
-			],
-		});
+		let user: Partial<User> | null = null;
+		try {
+			user = await this.usersRepository.findOne({
+				where: { id },
+				select: [
+					'id',
+					'email',
+					'name',
+					'brand_brief',
+					'api_key_openai',
+					'api_key_anthropic',
+					'api_key_gemini',
+					'claude_model',
+					'gemini_model',
+					'language',
+					'theme',
+					'notifications_enabled',
+				],
+			});
+		} catch {
+			// Columns claude_model/gemini_model may not exist yet (migration not run)
+			user = await this.usersRepository.findOne({
+				where: { id },
+				select: [
+					'id',
+					'email',
+					'name',
+					'brand_brief',
+					'api_key_openai',
+					'api_key_anthropic',
+					'api_key_gemini',
+					'language',
+					'theme',
+					'notifications_enabled',
+				],
+			}) as Partial<User> | null;
+			if (user) {
+				(user as Partial<User>).claude_model = null;
+				(user as Partial<User>).gemini_model = null;
+			}
+		}
 
 		if (!user) {
 			throw new NotFoundException(NotFoundMessage.USER_NOT_FOUND);
 		}
 
-		// Return with masked API keys and has_key flags
 		return {
 			...user,
 			api_key_openai: this.maskApiKey(user.api_key_openai),
@@ -157,10 +180,22 @@ export class UsersService {
 		claude_model: string | null;
 		gemini_model: string | null;
 	}> {
-		const user = await this.usersRepository.findOne({
-			where: { id },
-			select: ['api_key_openai', 'api_key_anthropic', 'api_key_gemini', 'claude_model', 'gemini_model'],
-		});
+		let user: { api_key_openai?: string | null; api_key_anthropic?: string | null; api_key_gemini?: string | null; claude_model?: string | null; gemini_model?: string | null } | null = null;
+		try {
+			user = await this.usersRepository.findOne({
+				where: { id },
+				select: ['api_key_openai', 'api_key_anthropic', 'api_key_gemini', 'claude_model', 'gemini_model'],
+			});
+		} catch {
+			user = await this.usersRepository.findOne({
+				where: { id },
+				select: ['api_key_openai', 'api_key_anthropic', 'api_key_gemini'],
+			}) as typeof user;
+			if (user) {
+				user.claude_model = null;
+				user.gemini_model = null;
+			}
+		}
 
 		if (!user) {
 			throw new NotFoundException(NotFoundMessage.USER_NOT_FOUND);
@@ -170,8 +205,8 @@ export class UsersService {
 			api_key_openai: user.api_key_openai || null,
 			api_key_anthropic: user.api_key_anthropic || null,
 			api_key_gemini: user.api_key_gemini || null,
-			claude_model: user.claude_model || null,
-			gemini_model: user.gemini_model || null,
+			claude_model: user.claude_model ?? null,
+			gemini_model: user.gemini_model ?? null,
 		};
 	}
 }
