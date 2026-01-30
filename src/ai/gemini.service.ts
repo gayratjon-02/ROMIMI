@@ -64,9 +64,10 @@ export class GeminiService {
 	/**
 	 * 🚀 PRODUCTION-READY: Generate images using Gemini 3 Pro Image Preview model
 	 * Uses the correct @google/genai SDK format with responseModalities
+	 * @param userApiKey - Optional user-specific API key
 	 */
-	async generateImages(prompt: string, aspectRatio?: string, resolution?: string): Promise<{ images: GeminiImageResult[] }> {
-		const client = this.getClient();
+	async generateImages(prompt: string, aspectRatio?: string, resolution?: string, userApiKey?: string): Promise<{ images: GeminiImageResult[] }> {
+		const client = this.getClient(userApiKey);
 		const startTime = Date.now();
 
 		// Build enhanced prompt - FOCUS ON PRODUCT, NOT PEOPLE
@@ -252,12 +253,14 @@ Aspect ratio: ${ratioText}. Resolution: ${resolutionText}.`;
 	/**
 	 * 🚀 Generate single image - main entry point
 	 * Includes retry logic for resilience
+	 * @param userApiKey - Optional user-specific API key
 	 */
 	async generateImage(
 		prompt: string,
 		_modelName?: string, // ignored, we always use gemini-3-pro-image-preview
 		aspectRatio?: string,
-		resolution?: string
+		resolution?: string,
+		userApiKey?: string
 	): Promise<GeminiImageResult> {
 		const maxRetries = 2;
 		const startTime = Date.now();
@@ -269,7 +272,7 @@ Aspect ratio: ${ratioText}. Resolution: ${resolutionText}.`;
 					await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds before retry
 				}
 
-				const result = await this.generateImages(prompt, aspectRatio, resolution);
+				const result = await this.generateImages(prompt, aspectRatio, resolution, userApiKey);
 
 				if (result.images.length > 0) {
 					const image = result.images[0];
@@ -643,8 +646,16 @@ Aspect ratio: ${ratioText}. Resolution: ${resolutionText}.`;
 
 	/**
 	 * Get or create Gemini client
+	 * @param userApiKey - Optional user-specific API key (takes precedence over env var)
 	 */
-	private getClient(): GoogleGenAI {
+	private getClient(userApiKey?: string): GoogleGenAI {
+		// If user has their own API key, create a fresh client (not cached)
+		if (userApiKey && userApiKey.trim() && !userApiKey.includes('****')) {
+			this.logger.log(`🔑 Using user-provided Gemini API key`);
+			return new GoogleGenAI({ apiKey: userApiKey });
+		}
+
+		// Use cached default client
 		if (this.client) {
 			return this.client;
 		}
@@ -656,11 +667,22 @@ Aspect ratio: ${ratioText}. Resolution: ${resolutionText}.`;
 			throw new InternalServerErrorException(AIMessage.API_KEY_MISSING);
 		}
 
-		this.logger.log(`✅ Gemini client initialized`);
+		this.logger.log(`🔑 Using system Gemini API key`);
 		this.logger.log(`   - Model: ${this.MODEL}`);
 		this.logger.log(`   - API Key: ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`);
 
 		this.client = new GoogleGenAI({ apiKey });
 		return this.client;
+	}
+
+	/**
+	 * Get current API key status (masked for security)
+	 */
+	getApiKeyStatus(): { hasSystemKey: boolean; systemKeyMasked: string | null } {
+		const apiKey = this.configService.get<string>('gemini.apiKey') || process.env.GEMINI_API_KEY;
+		return {
+			hasSystemKey: !!apiKey,
+			systemKeyMasked: apiKey ? `${apiKey.substring(0, 10)}****${apiKey.substring(apiKey.length - 4)}` : null,
+		};
 	}
 }

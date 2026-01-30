@@ -142,4 +142,28 @@ export class UsersService {
 			message: apiKey ? `${keyType} API key updated` : `${keyType} API key removed`,
 		};
 	}
+
+	/**
+	 * Get user's raw API keys (not masked) - for internal use only
+	 */
+	async getUserApiKeys(id: string): Promise<{
+		api_key_openai: string | null;
+		api_key_anthropic: string | null;
+		api_key_gemini: string | null;
+	}> {
+		const user = await this.usersRepository.findOne({
+			where: { id },
+			select: ['api_key_openai', 'api_key_anthropic', 'api_key_gemini'],
+		});
+
+		if (!user) {
+			throw new NotFoundException(NotFoundMessage.USER_NOT_FOUND);
+		}
+
+		return {
+			api_key_openai: user.api_key_openai || null,
+			api_key_anthropic: user.api_key_anthropic || null,
+			api_key_gemini: user.api_key_gemini || null,
+		};
+	}
 }

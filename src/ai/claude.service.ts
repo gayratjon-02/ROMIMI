@@ -647,7 +647,18 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 		return parsed || { raw: text };
 	}
 
-	private getClient(): Anthropic {
+	/**
+	 * Get Anthropic client
+	 * @param userApiKey - Optional user-specific API key (takes precedence over env var)
+	 */
+	private getClient(userApiKey?: string): Anthropic {
+		// If user has their own API key, create a fresh client (not cached)
+		if (userApiKey && userApiKey.trim() && !userApiKey.includes('****')) {
+			this.logger.log(`🔑 Using user-provided Anthropic API key`);
+			return new Anthropic({ apiKey: userApiKey });
+		}
+
+		// Use cached default client
 		if (this.client) {
 			return this.client;
 		}
@@ -659,20 +670,33 @@ Generate the 6 merged prompts now. Return ONLY valid JSON object with the struct
 			throw new InternalServerErrorException(AIMessage.API_KEY_MISSING);
 		}
 
+		this.logger.log(`🔑 Using system Anthropic API key`);
 		this.client = new Anthropic({ apiKey });
 		return this.client;
+	}
+
+	/**
+	 * Get current API key status (masked for security)
+	 */
+	getApiKeyStatus(): { hasSystemKey: boolean; systemKeyMasked: string | null } {
+		const apiKey = this.configService.get<string>('CLAUDE_API_KEY');
+		return {
+			hasSystemKey: !!apiKey,
+			systemKeyMasked: apiKey ? `${apiKey.substring(0, 10)}****${apiKey.substring(apiKey.length - 4)}` : null,
+		};
 	}
 
 	private async createMessage(params: {
 		content: ClaudeContentBlock[];
 		max_tokens: number;
+		userApiKey?: string;
 	}): Promise<Messages.Message> {
 		const maxRetries = 3;
 		const baseDelay = 2000; // 2 seconds base delay
 
 		for (let attempt = 0; attempt < maxRetries; attempt++) {
 			try {
-				const res = await this.getClient().messages.create({
+				const res = await this.getClient(params.userApiKey).messages.create({
 					model: this.model,
 					max_tokens: params.max_tokens,
 					messages: [
