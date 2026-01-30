@@ -621,14 +621,15 @@ export class GenerationsService {
 				const promptObject = mergedPrompts[shotType as keyof MergedPrompts];
 
 				// Support legacy 'prompt' field if 'gemini_prompt' is missing
-				const prompt = promptObject.gemini_prompt || promptObject.prompt;
-
-				this.logger.log(`🔍 DEBUG PROMPT for ${shotType}: gemini_prompt="${promptObject.gemini_prompt}", prompt="${promptObject.prompt}", FINAL="${prompt}"`);
+				const prompt = (promptObject.gemini_prompt || promptObject.prompt || '').trim();
 
 				if (!prompt) {
-					this.logger.warn(`⚠️ No prompt found for shot type: ${shotType} (gemini_prompt and prompt are empty)`);
+					this.logger.error(`❌ CRITICAL: No prompt found for shot type: ${shotType}`);
+					this.logger.error(`   - Object Dump: ${JSON.stringify(promptObject)}`);
 					continue;
 				}
+
+				this.logger.log(`🔍 DEBUG PROMPT for ${shotType}: Length=${prompt.length}, Start=${prompt.substring(0, 20)}`);
 				const visualIndex = allShotTypes.indexOf(shotType);
 
 				this.logger.log(`🎨 Generating ${completedCount + 1}/${totalShots}: ${shotType} (${promptObject.display_name})`);
