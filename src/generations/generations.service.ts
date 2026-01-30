@@ -623,6 +623,8 @@ export class GenerationsService {
 				// Support legacy 'prompt' field if 'gemini_prompt' is missing
 				const prompt = promptObject.gemini_prompt || promptObject.prompt;
 
+				this.logger.log(`🔍 DEBUG PROMPT for ${shotType}: gemini_prompt="${promptObject.gemini_prompt}", prompt="${promptObject.prompt}", FINAL="${prompt}"`);
+
 				if (!prompt) {
 					this.logger.warn(`⚠️ No prompt found for shot type: ${shotType} (gemini_prompt and prompt are empty)`);
 					continue;
