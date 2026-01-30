@@ -445,29 +445,44 @@ export class CollectionsService {
 
 	/**
 	 * Generate fixed_elements from analyzed DA JSON
+	 * Uses the NORMALIZED schema (left_side/right_side, hex, type)
 	 */
 	private generateFixedElementsFromDA(daJSON: AnalyzedDAJSON): FixedElements {
+		// Access props with type assertion since we normalized it
+		const props = (daJSON as any).props || {};
+		const leftSide = props.left_side || [];
+		const rightSide = props.right_side || [];
+
+		// Access background - handle both old and new schemas
+		const bgHex = (daJSON.background as any)?.hex || (daJSON.background as any)?.color_hex || '#FFFFFF';
+		const bgDesc = (daJSON.background as any)?.type || (daJSON.background as any)?.description || 'Studio background';
+
+		// Access styling - handle both old and new key names
+		const styling = daJSON.styling || {} as any;
+		const bottom = styling.bottom || styling.pants || 'Black trousers';
+		const feet = styling.feet || styling.footwear || 'BAREFOOT';
+
 		return {
 			background: {
-				wall_hex: daJSON.background.color_hex,
-				wall_description: daJSON.background.description,
-				floor_hex: daJSON.background.color_hex, // Default to same as wall, can be overridden
-				floor_description: daJSON.background.description,
+				wall_hex: bgHex,
+				wall_description: bgDesc,
+				floor_hex: bgHex, // Default to same as wall
+				floor_description: bgDesc,
 			},
 			props: {
-				left: daJSON.props.items.slice(0, Math.ceil(daJSON.props.items.length / 2)),
-				right: daJSON.props.items.slice(Math.ceil(daJSON.props.items.length / 2)),
+				left: leftSide,
+				right: rightSide,
 				center: [],
 			},
 			styling: {
-				bottom: daJSON.styling.bottom,
-				feet: daJSON.styling.feet,
+				bottom: bottom,
+				feet: feet,
 			},
-			lighting: daJSON.lighting.type,
-			mood: daJSON.mood,
+			lighting: daJSON.lighting?.type || 'Soft studio lighting',
+			mood: daJSON.mood || 'Professional',
 			composition_defaults: {
-				duo: daJSON.composition.layout,
-				solo: daJSON.composition.layout,
+				duo: (daJSON as any).composition?.layout || 'centered',
+				solo: (daJSON as any).composition?.layout || 'centered',
 			},
 		};
 	}
