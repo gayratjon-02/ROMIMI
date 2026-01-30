@@ -163,10 +163,10 @@ export class GenerationsService {
 	async executeGeneration(generationId: string, userId: string): Promise<Generation> {
 		this.logger.log(`🚀 Executing generation: ${generationId}`);
 
-		// 1. Fetch Generation with relations
+		// 1. Fetch Generation with relations (include both da_preset and collection)
 		const generation = await this.generationsRepository.findOne({
 			where: { id: generationId },
-			relations: ['product', 'da_preset'],
+			relations: ['product', 'da_preset', 'collection'],
 		});
 
 		if (!generation) {
@@ -190,8 +190,12 @@ export class GenerationsService {
 			throw new BadRequestException('Generation has no linked product');
 		}
 
-		if (!generation.da_preset) {
-			throw new BadRequestException('Generation has no linked DA Preset');
+		// Check for DA source: either da_preset OR collection with analyzed_da_json
+		const hasDAPreset = !!generation.da_preset;
+		const hasCollectionDA = !!generation.collection?.analyzed_da_json;
+
+		if (!hasDAPreset && !hasCollectionDA) {
+			throw new BadRequestException('Generation has no DA source (needs either DA Preset or Collection with analyzed DA)');
 		}
 
 		// 2. Update status to PROCESSING
@@ -205,11 +209,30 @@ export class GenerationsService {
 			// 3. Build 6 prompts using PromptBuilder
 			this.logger.log(`🏗️ Building prompts for product: ${generation.product.name}`);
 
-			const generatedPrompts = this.promptBuilderService.buildPromptsFromEntities({
-				product: generation.product,
-				daPreset: generation.da_preset,
-				modelType: generation.model_type || 'adult',
-			});
+			let generatedPrompts;
+
+			if (hasDAPreset) {
+				// Use DA Preset flow (Phase 3)
+				this.logger.log(`📋 Using DA Preset: ${generation.da_preset.name}`);
+				generatedPrompts = this.promptBuilderService.buildPromptsFromEntities({
+					product: generation.product,
+					daPreset: generation.da_preset,
+					modelType: generation.model_type || 'adult',
+				});
+			} else {
+				// Use Collection DA flow (Legacy)
+				this.logger.log(`📋 Using Collection DA: ${generation.collection.name}`);
+				const productJSON = generation.product.final_product_json || generation.product.analyzed_product_json;
+				const convertedDA = this.convertCollectionDAToPresetFormat(generation.collection.analyzed_da_json, generation.collection.name);
+
+				generatedPrompts = this.promptBuilderService.buildPrompts({
+					product: productJSON as AnalyzeProductDirectResponse,
+					da: convertedDA,
+					options: {
+						model_type: (generation.model_type as 'adult' | 'kid') || 'adult',
+					}
+				});
+			}
 
 			// Save prompts to generation
 			generation.merged_prompts = generatedPrompts;
