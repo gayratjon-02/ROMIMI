@@ -219,7 +219,13 @@ export class PromptBuilderService {
         const resolutionSuffix = this.getResolutionQualitySuffix(resolution);
         this.logger.log(`📐 Resolution for prompts: "${resolution}" → force-append suffix (${resolutionSuffix.length} chars)`);
         const qualitySuffix = `, ${da.quality}, ${da.lighting.type}, ${da.lighting.temperature}`;
-        const baseAttire = `Wearing ${product.visual_specs.color_name} ${product.general_info.product_name}`;
+
+        // 🚀 DEFAULT TOP RULE: If product is a Bottom, model must wear a white t-shirt (Anti-Nudity)
+        let baseAttire = `Wearing ${product.visual_specs.color_name} ${product.general_info.product_name}`;
+        if (isProductBottom) {
+            baseAttire = `Model wearing a plain white t-shirt on upper body, fully clothed top. ${baseAttire}`;
+            this.logger.log(`👕 Anti-Nudity: Product is BOTTOM → Prepending 'White T-Shirt' to positive prompt`);
+        }
 
         // SMART STYLING: If product IS a bottom → only footwear, no DA pants
         // If product is NOT a bottom (top/jacket) → include both pants and footwear
@@ -264,7 +270,12 @@ export class PromptBuilderService {
         // ═══════════════════════════════════════════════════════════
 
         const GLOBAL_NEGATIVE_PROMPT = 'collage, split screen, inset image, picture in picture, multiple views, overlay, montage, composite image, promotional material, text blocks, watermarks, border, frame, padding, white background';
-        const negativePrompt = `${GLOBAL_NEGATIVE_PROMPT}, text, watermark, blurry, low quality, distorted, extra limbs, bad anatomy, mannequin, ghost mannequin, floating clothes, 3d render, artificial face, deformed hands, extra fingers`;
+        let negativePrompt = `${GLOBAL_NEGATIVE_PROMPT}, text, watermark, blurry, low quality, distorted, extra limbs, bad anatomy, mannequin, ghost mannequin, floating clothes, 3d render, artificial face, deformed hands, extra fingers`;
+
+        // 🚀 ANTI-NUDITY SHIELD: If product is a Bottom, block shirtless models aggressively
+        if (isProductBottom) {
+            negativePrompt += ', shirtless, naked torso, bare chest, abs, muscles, underwear model, swimwear, skin showing, topless, navel';
+        }
 
         // ═══════════════════════════════════════════════════════════
         // 6. GENERATE 6 SHOT PROMPTS (MergedPromptObject format)
@@ -308,7 +319,7 @@ export class PromptBuilderService {
 
         if (soloSubject === 'kid') {
             // For KID solo: Block adults/fathers AND second person
-            soloNegative += `${TWO_PEOPLE_NEGATIVES}, adult, man, father, male model, beard, stubble, mustache, facial hair, mature man, wrinkles, tall, muscular`;
+            soloNegative += `${TWO_PEOPLE_NEGATIVES}, adult, man, father, male model, beard, stubble, mustache, facial hair, mature man, wrinkles, tall, muscular, hairy chest`;
         } else {
             // For ADULT solo: Block kids AND second person
             soloNegative += `${TWO_PEOPLE_NEGATIVES}, child, kid, toddler, baby, small size, son, daughter`;
