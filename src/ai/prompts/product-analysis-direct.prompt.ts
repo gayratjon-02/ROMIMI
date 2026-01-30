@@ -97,6 +97,57 @@ You must prevent "hallucinations" (guessing) by strictly adhering to visual evid
    * Sweatshirt: Ribbed cuffs + Ribbed hem
    * Do NOT hallucinate ribbed elements on T-Shirts!
 
+6. **THE "BOMBER vs. TRUCKER JACKET" LAW (Garment Classification):**
+   ⚠️ CRITICAL FOR JACKET CLASSIFICATION!
+
+   **STRICT RULE:**
+   * Do NOT classify a jacket as a "Bomber" unless it has RIBBED ELASTIC CUFFS and WAISTBAND.
+   * If the jacket has a STRAIGHT HEM or STRAIGHT COLLAR → Classify as "Trucker Jacket" or "Overshirt"
+
+   | Visual Evidence | Correct Classification |
+   |-----------------|------------------------|
+   | Ribbed elastic cuffs + Ribbed waistband | "Bomber Jacket" |
+   | Straight hem + Button/Snap closure | "Trucker Jacket" |
+   | Straight hem + Relaxed fit | "Overshirt" or "Shirt Jacket" |
+   | Leather + Asymmetric zip | "Moto/Biker Jacket" |
+
+   **Physical Reality:** Bomber jackets have gathered, elastic cuffs. Truckers have straight-cut hems.
+
+7. **THE "HARDWARE PRECISION" LAW (Aglets, Zippers, Buttons):**
+   ⚠️ ZOOM IN ON ALL HARDWARE BEFORE REPORTING COLOR!
+
+   **STRICT RULE:**
+   * Distinguish "Silver/Metallic" (shiny, reflective, metal-tone) from "White/Plastic" (matte, opaque, non-reflective)
+   * Do NOT hallucinate "white aglets" if they are actually "silver/metallic aglets"
+
+   | Visual Evidence | Correct Output |
+   |-----------------|----------------|
+   | Shiny, reflective surface | "Silver-tone metal" or "Metallic finish" |
+   | Matte, opaque surface | "White plastic" or "Matte white" |
+   | Gold-tinted metal | "Gold-tone hardware" |
+   | Gunmetal/dark metal | "Gunmetal finish" or "Matte black metal" |
+
+   **Aglet Rule:** Drawstring aglets are typically METAL unless visibly plastic.
+   Check light reflection on the aglet surface to determine material.
+
+8. **THE "SUEDE COLOR RICHNESS" LAW (Material-Specific Color):**
+   ⚠️ FOR SUEDE AND NUBUCK MATERIALS ONLY!
+
+   **STRICT RULE:**
+   * Suede absorbs light differently than other fabrics - describe color with DEPTH and RICHNESS
+   * Use evocative, premium color names for suede to prevent washed-out image generation
+
+   | Generic Color | Correct Suede Color Description |
+   |---------------|--------------------------------|
+   | "Red" | "Deep Burgundy Suede" or "Rich Oxblood Suede" |
+   | "Brown" | "Warm Caramel Suede" or "Deep Espresso Suede" |
+   | "Blue" | "Midnight Navy Suede" or "Deep Indigo Suede" |
+   | "Green" | "Forest Moss Suede" or "Hunter Green Suede" |
+   | "Gray" | "Charcoal Stone Suede" or "Slate Suede" |
+   | "Tan" | "Honey Beige Suede" or "Sand Dune Suede" |
+
+   **Suede Texture Rule:** Always add "with soft napped finish and light-absorbing matte surface"
+
 ═══════════════════════════════════════════════════════════
 📋 REQUIRED JSON OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════
@@ -183,23 +234,31 @@ Return ONLY valid JSON. Do not include markdown formatting.
 ❌ "Ribbed hem" on T-Shirt (T-Shirts have straight folded hem!)
 ❌ Missing thigh logo on joggers/track pants
 ❌ Writing "RR" when logo is actually a bird/pelican symbol
+❌ Calling a jacket "Bomber" when it has NO ribbed cuffs/waistband!
+❌ Saying "white aglets" when they are actually silver/metallic!
+❌ Using generic "Red" or "Brown" for Suede instead of rich color names!
 
 ✅ VERIFY: Is there a zipper at the ankle? → Straight hem, not ribbed!
 ✅ SCAN: Check thighs for small logos on pants
 ✅ COMPARE: Front and back logos analyzed separately
 ✅ CHECK: Thread lines = embroidery, Smooth raised = embossed
+✅ JACKET: Ribbed cuffs = Bomber, Straight hem = Trucker/Overshirt
+✅ HARDWARE: Zoom in! Shiny = Metal, Matte = Plastic
+✅ SUEDE: Use rich descriptive colors (Deep Burgundy, Warm Caramel)
 
 ═══════════════════════════════════════════════════════════
 ⚡ EXECUTION PROTOCOL
 ═══════════════════════════════════════════════════════════
 
-1. Identify garment category FIRST (pants vs top)
+1. Identify garment category FIRST (pants vs top vs jacket)
 2. For PANTS: Apply Zipper vs Cuff Law at ankle
 3. For PANTS: Scan thighs for branding
-4. Analyze FRONT logo independently
-5. Analyze BACK logo independently
-6. Describe ALL hardware (zippers, aglets, buttons)
-7. Use Wearer's Left/Right for spatial accuracy
-8. Return ONLY valid JSON - no markdown, no explanations
+4. For JACKETS: Apply Bomber vs Trucker Law (check cuffs!)
+5. Analyze FRONT logo independently
+6. Analyze BACK logo independently
+7. Describe ALL hardware (zippers, aglets, buttons) - ZOOM IN for material!
+8. For SUEDE: Use rich, evocative color descriptions
+9. Use Wearer's Left/Right for spatial accuracy
+10. Return ONLY valid JSON - no markdown, no explanations
 
 BEGIN MANUFACTURING-GRADE ANALYSIS NOW.`;
