@@ -10,6 +10,7 @@ import { GenerationStatus } from '../libs/enums';
 import { GenerationsService } from './generations.service';
 import { FilesService } from '../files/files.service';
 import { PromptBuilder } from '../common/utils/prompt-builder.util';
+import { GenerationGateway } from './generation.gateway';
 
 export interface GenerationJobData {
 	generationId: string;
@@ -30,7 +31,8 @@ export class GenerationProcessor {
 		private readonly geminiService: GeminiService,
 		private readonly generationsService: GenerationsService,
 		private readonly filesService: FilesService,
-	) {}
+		private readonly generationGateway: GenerationGateway,
+	) { }
 
 	@Process()
 	async processGeneration(job: Job<GenerationJobData>): Promise<void> {
@@ -48,16 +50,16 @@ export class GenerationProcessor {
 				where: { id: generationId },
 			});
 
-		if (!generation) {
-			throw new Error(`Generation ${generationId} not found`);
-		}
+			if (!generation) {
+				throw new Error(`Generation ${generationId} not found`);
+			}
 
-		// Set started_at when generation begins processing
-		if (!generation.started_at) {
-			generation.started_at = new Date();
-		}
-		generation.status = GenerationStatus.PROCESSING;
-		await this.generationsRepository.save(generation);
+			// Set started_at when generation begins processing
+			if (!generation.started_at) {
+				generation.started_at = new Date();
+			}
+			generation.status = GenerationStatus.PROCESSING;
+			await this.generationsRepository.save(generation);
 
 			// Initialize visuals array with structure
 			// Use provided visualTypes if available, otherwise fall back to index-based
@@ -73,16 +75,16 @@ export class GenerationProcessor {
 
 			// 🚀 PARALLEL GENERATION: All images at once for maximum speed
 			this.logger.log(`🚀 STARTING PARALLEL GENERATION: ${prompts.length} images for generation ${generationId}`);
-			
+
 			// Mark all as processing
 			visuals.forEach(v => v.status = 'processing');
 			generation.visuals = visuals;
 			await this.generationsRepository.save(generation);
 
 			// Generation started - frontend will poll for updates
-			
+
 			const geminiModel = model || process.env.GEMINI_MODEL || 'gemini-3-pro-image-preview';
-			
+
 			// Process ALL images in parallel
 			const imagePromises = prompts.map(async (prompt, i) => {
 				const visualType = visuals[i]?.type || `visual_${i}`;
@@ -101,7 +103,7 @@ export class GenerationProcessor {
 						generation.aspect_ratio,
 						generation.resolution
 					);
-					
+
 					// Save image
 					let imageUrl: string | null = null;
 					let imageFilename: string | null = null;
@@ -115,7 +117,7 @@ export class GenerationProcessor {
 							imageUrl = `data:${result.mimeType};base64,${result.data}`;
 						}
 					}
-					
+
 					// Update visual immediately
 					visuals[i] = {
 						...visuals[i],
@@ -126,13 +128,23 @@ export class GenerationProcessor {
 						image_filename: imageFilename,
 						generated_at: new Date().toISOString(),
 					};
-					
+
 					// Save to DB immediately so frontend can see it
 					generation.visuals = [...visuals];
 					await this.generationsRepository.save(generation);
-					
+
 					this.logger.log(`✅ [${i + 1}/${prompts.length}] ${visualType} completed!`);
-					
+
+					// Emit event
+					this.generationGateway.emitVisualCompleted(generationId, {
+						type: visualType,
+						index: i,
+						image_url: imageUrl || '',
+						generated_at: new Date().toISOString(),
+						status: 'completed',
+						prompt: prompt,
+					});
+
 					// Update progress
 					const completed = visuals.filter(v => v.status === 'completed' || v.status === 'failed').length;
 					generation.progress_percent = Math.round((completed / prompts.length) * 100);
@@ -140,18 +152,25 @@ export class GenerationProcessor {
 					await this.generationsRepository.save(generation);
 					job.progress(generation.progress_percent);
 
+					this.generationGateway.emitProgress(generationId, {
+						progress_percent: generation.progress_percent,
+						completed: generation.completed_visuals_count,
+						total: prompts.length,
+						elapsed_seconds: 0, // Calculate if needed
+					});
+
 					// Image saved to DB - frontend will poll and see it
-					
+
 					return { success: true, index: i };
 				} catch (error: any) {
 					this.logger.error(`❌ [${i + 1}/${prompts.length}] ${visualType} failed: ${error?.message}`);
-					
+
 					visuals[i] = {
 						...visuals[i],
 						status: 'failed',
 						error: error?.message || 'Unknown error',
 					};
-					
+
 					generation.visuals = [...visuals];
 					await this.generationsRepository.save(generation);
 
@@ -161,19 +180,29 @@ export class GenerationProcessor {
 					await this.generationsRepository.save(generation);
 
 					// Failed image saved to DB - frontend will poll and see it
-					
+
+					this.generationGateway.emitVisualCompleted(generationId, {
+						type: visualType,
+						index: i,
+						image_url: '',
+						generated_at: new Date().toISOString(),
+						status: 'failed',
+						error: error?.message,
+						prompt: prompt,
+					});
+
 					return { success: false, index: i, error: error?.message };
 				}
 			});
-			
+
 			// Wait for all to complete
 			await Promise.allSettled(imagePromises);
-			
+
 			job.progress(100);
 
 			// Check final results after sequential processing is complete
 			this.logger.log(`🏁 All image generations finished for ${generationId}`);
-			
+
 			const allCompleted = visuals.every((v) => v.status === 'completed');
 			const allFailed = visuals.every((v) => v.status === 'failed');
 			const anyFailed = visuals.some((v) => v.status === 'failed');
@@ -199,16 +228,22 @@ export class GenerationProcessor {
 				generation.completed_at = new Date();
 				this.logger.warn(`⚠️ Generation ${generationId} completed with ${failedCount} failures, ${completedCount} succeeded`);
 			}
-			
+
 			// Final progress update
 			generation.progress_percent = 100;
 			generation.completed_visuals_count = completedCount;
-			
+
 			this.logger.log(`📊 Generation ${generationId} finished: ${completedCount} completed, ${failedCount} failed`);
 
 			await this.generationsRepository.save(generation);
 
 			// Generation complete - frontend will poll and see final status
+			this.generationGateway.emitComplete(generationId, {
+				status: generation.status === GenerationStatus.FAILED ? 'failed' : 'completed',
+				completed: completedCount,
+				total: visuals.length,
+				visuals: generation.visuals,
+			});
 
 			// Save generated image filenames to product for quick access later
 			if (generation.product_id && completedCount > 0) {
@@ -216,7 +251,7 @@ export class GenerationProcessor {
 					const product = await this.productsRepository.findOne({
 						where: { id: generation.product_id },
 					});
-					
+
 					if (product) {
 						const generatedImages: Record<string, string> = {};
 						for (const visual of visuals) {
@@ -224,7 +259,7 @@ export class GenerationProcessor {
 								generatedImages[visual.type] = visual.image_filename;
 							}
 						}
-						
+
 						if (Object.keys(generatedImages).length > 0) {
 							product.generated_images = generatedImages;
 							await this.productsRepository.save(product);
@@ -244,17 +279,17 @@ export class GenerationProcessor {
 			}
 		} catch (error) {
 			this.logger.error(`Generation ${generationId} failed: ${error.message}`, error.stack);
-			
+
 			// Update generation status to failed
 			const generation = await this.generationsRepository.findOne({
 				where: { id: generationId },
 			});
-			
+
 			if (generation) {
 				generation.status = GenerationStatus.FAILED;
 				await this.generationsRepository.save(generation);
 			}
-			
+
 			throw error;
 		}
 	}

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GenerationsService } from './generations.service';
+import { GenerationGateway } from './generation.gateway';
 import { GenerationsController } from './generations.controller';
 import { GenerationEventsController } from './generation-events.controller';
 import { GenerationProcessor } from './generation.processor';
@@ -30,7 +31,7 @@ import { FilesModule } from '../files/files.module';
 		FilesModule,
 	],
 	controllers: [GenerationsController, GenerationEventsController],
-	providers: [GenerationsService, GenerationProcessor],
+	providers: [GenerationsService, GenerationProcessor, GenerationGateway],
 	exports: [GenerationsService],
 })
-export class GenerationsModule {}
+export class GenerationsModule { }
