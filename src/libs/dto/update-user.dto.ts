@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsBoolean } from 'class-validator';
 import { ValidationMessage } from '../enums';
 
 export class UpdateUserDto {
@@ -9,4 +9,32 @@ export class UpdateUserDto {
 	@IsString()
 	@IsOptional()
 	name?: string;
+
+	@IsString()
+	@IsOptional()
+	brand_brief?: string;
+
+	@IsString()
+	@IsOptional()
+	api_key_openai?: string;
+
+	@IsString()
+	@IsOptional()
+	api_key_anthropic?: string;
+
+	@IsString()
+	@IsOptional()
+	api_key_gemini?: string;
+
+	@IsString()
+	@IsOptional()
+	language?: string;
+
+	@IsString()
+	@IsOptional()
+	theme?: string;
+
+	@IsBoolean()
+	@IsOptional()
+	notifications_enabled?: boolean;
 }

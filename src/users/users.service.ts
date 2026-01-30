@@ -12,17 +12,73 @@ export class UsersService {
 		private usersRepository: Repository<User>,
 	) {}
 
+	// Helper to mask API keys for security
+	private maskApiKey(key: string | null): string | null {
+		if (!key) return null;
+		if (key.length <= 8) return '****';
+		return key.substring(0, 4) + '****' + key.substring(key.length - 4);
+	}
+
 	async findOne(id: string): Promise<User> {
 		const user = await this.usersRepository.findOne({
 			where: { id },
-			select: ['id', 'email', 'name', 'created_at', 'updated_at'],
+			select: [
+				'id',
+				'email',
+				'name',
+				'brand_brief',
+				'api_key_openai',
+				'api_key_anthropic',
+				'api_key_gemini',
+				'language',
+				'theme',
+				'notifications_enabled',
+				'created_at',
+				'updated_at',
+			],
 		});
 
 		if (!user) {
 			throw new NotFoundException(NotFoundMessage.USER_NOT_FOUND);
 		}
 
-		return user;
+		// Mask API keys before returning
+		return {
+			...user,
+			api_key_openai: this.maskApiKey(user.api_key_openai),
+			api_key_anthropic: this.maskApiKey(user.api_key_anthropic),
+			api_key_gemini: this.maskApiKey(user.api_key_gemini),
+		} as User;
+	}
+
+	async getSettings(id: string): Promise<Partial<User>> {
+		const user = await this.usersRepository.findOne({
+			where: { id },
+			select: [
+				'id',
+				'email',
+				'name',
+				'brand_brief',
+				'api_key_openai',
+				'api_key_anthropic',
+				'api_key_gemini',
+				'language',
+				'theme',
+				'notifications_enabled',
+			],
+		});
+
+		if (!user) {
+			throw new NotFoundException(NotFoundMessage.USER_NOT_FOUND);
+		}
+
+		// Return with masked API keys and has_key flags
+		return {
+			...user,
+			api_key_openai: this.maskApiKey(user.api_key_openai),
+			api_key_anthropic: this.maskApiKey(user.api_key_anthropic),
+			api_key_gemini: this.maskApiKey(user.api_key_gemini),
+		};
 	}
 
 	async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
@@ -49,8 +105,41 @@ export class UsersService {
 		Object.assign(user, updateUserDto);
 		const updatedUser = await this.usersRepository.save(user);
 
-		// Return without password_hash
+		// Return without password_hash and with masked API keys
 		const { password_hash, ...result } = updatedUser;
-		return result as User;
+		return {
+			...result,
+			api_key_openai: this.maskApiKey(result.api_key_openai),
+			api_key_anthropic: this.maskApiKey(result.api_key_anthropic),
+			api_key_gemini: this.maskApiKey(result.api_key_gemini),
+		} as User;
+	}
+
+	async updateApiKey(
+		id: string,
+		keyType: 'openai' | 'anthropic' | 'gemini',
+		apiKey: string | null,
+	): Promise<{ success: boolean; message: string }> {
+		const user = await this.usersRepository.findOne({
+			where: { id },
+		});
+
+		if (!user) {
+			throw new NotFoundException(NotFoundMessage.USER_NOT_FOUND);
+		}
+
+		const fieldMap = {
+			openai: 'api_key_openai',
+			anthropic: 'api_key_anthropic',
+			gemini: 'api_key_gemini',
+		};
+
+		user[fieldMap[keyType]] = apiKey;
+		await this.usersRepository.save(user);
+
+		return {
+			success: true,
+			message: apiKey ? `${keyType} API key updated` : `${keyType} API key removed`,
+		};
 	}
 }

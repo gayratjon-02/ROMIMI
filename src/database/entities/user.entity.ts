@@ -22,6 +22,28 @@ export class User {
   @Column({ type: 'varchar', length: 255, nullable: true })
   name: string;
 
+  // Settings fields
+  @Column({ type: 'text', nullable: true })
+  brand_brief: string;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  api_key_openai: string;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  api_key_anthropic: string;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  api_key_gemini: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, default: 'en' })
+  language: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, default: 'light' })
+  theme: string;
+
+  @Column({ type: 'boolean', default: true })
+  notifications_enabled: boolean;
+
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 

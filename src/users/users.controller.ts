@@ -15,11 +15,32 @@ export class UsersController {
 		return this.usersService.findOne(user.id);
 	}
 
+	@Get('getSettings')
+	async getSettings(@CurrentUser() user: User): Promise<Partial<User>> {
+		return this.usersService.getSettings(user.id);
+	}
+
 	@Post('updateUser')
 	async updateUser(
 		@CurrentUser() user: User,
 		@Body() updateUserDto: UpdateUserDto,
 	): Promise<Omit<User, 'password_hash'>> {
 		return this.usersService.update(user.id, updateUserDto);
+	}
+
+	@Post('updateSettings')
+	async updateSettings(
+		@CurrentUser() user: User,
+		@Body() updateUserDto: UpdateUserDto,
+	): Promise<Omit<User, 'password_hash'>> {
+		return this.usersService.update(user.id, updateUserDto);
+	}
+
+	@Post('updateApiKey')
+	async updateApiKey(
+		@CurrentUser() user: User,
+		@Body() body: { keyType: 'openai' | 'anthropic' | 'gemini'; apiKey: string | null },
+	): Promise<{ success: boolean; message: string }> {
+		return this.usersService.updateApiKey(user.id, body.keyType, body.apiKey);
 	}
 }
