@@ -284,15 +284,22 @@ export class PromptBuilderService {
         // 6.1 DUO (Father + Son) — FORCE: resolution suffix at very end of prompt
         const duoPrompt = this.buildDuoPrompt(product, da, baseAttire, styling, scene, zipperText, qualitySuffix);
         const duo: MergedPromptObject = {
-            ...SHOT_CONFIGS.duo,
-            prompt: duoPrompt + resolutionSuffix,
+            visual_id: `visual_1_duo_adult`,
+            shot_type: 'duo',
+            model_type: 'adult',
+            gemini_prompt: duoPrompt + resolutionSuffix,
             negative_prompt: negativePrompt,
-            background,
-            product_details: productDetails,
-            da_elements: daElements,
+            output: {
+                resolution: resolution,
+                aspect_ratio: (options as any).aspect_ratio || '4:5'
+            },
+            display_name: 'Duo Shot (Father & Son)',
             editable: true,
             last_edited_at: null,
-        };
+            background: background,
+            product_details: productDetails,
+            da_elements: daElements
+        } as MergedPromptObject;
 
         // ═══════════════════════════════════════════════════════════
         // 🆕 SHOT OPTIONS: Derive per-shot settings from options
@@ -326,67 +333,92 @@ export class PromptBuilderService {
         }
 
         const solo: MergedPromptObject = {
-            ...SHOT_CONFIGS.solo,
+            visual_id: `visual_2_solo_${soloSubject}`,
+            shot_type: 'solo',
+            model_type: soloSubject,
+            gemini_prompt: soloPrompt + resolutionSuffix,
+            negative_prompt: soloNegative,
+            output: {
+                resolution: resolution,
+                aspect_ratio: (options as any).aspect_ratio || '4:5'
+            },
             display_name: soloSubject === 'adult' ? 'SOLO Adult Model' : 'SOLO Kid Model',
-            prompt: soloPrompt + resolutionSuffix,
-            negative_prompt: soloNegative, // Use specific negative prompt
-            background,
-            product_details: productDetails,
-            da_elements: daElements,
             editable: true,
             last_edited_at: null,
-        };
+            background: background,
+            product_details: productDetails,
+            da_elements: daElements
+        } as MergedPromptObject;
 
         // 6.3 FLAT LAY FRONT — FORCE: resolution suffix at very end
         const flatLayFrontPrompt = this.buildFlatLayFrontPrompt(product, da, flatLayFrontSize, logoTextFront, qualitySuffix);
         const flatLayFrontNegative = this.buildShotNegativePrompt('flatlay_front', product);
         const flatlay_front: MergedPromptObject = {
-            ...SHOT_CONFIGS.flatlay_front,
+            visual_id: `visual_3_flatlay_front_${flatLayFrontSize}`,
+            shot_type: 'flatlay_front',
+            model_type: flatLayFrontSize,
+            gemini_prompt: flatLayFrontPrompt + resolutionSuffix,
+            negative_prompt: this.buildShotNegativePrompt('flatlay_front', product),
+            output: {
+                resolution: resolution,
+                aspect_ratio: (options as any).aspect_ratio || '4:5'
+            },
             display_name: flatLayFrontSize === 'adult' ? 'Flat Lay Front (Adult Size)' : 'Flat Lay Front (Kid Size)',
-            prompt: flatLayFrontPrompt + resolutionSuffix,
-            negative_prompt: flatLayFrontNegative,
-            background,
+            editable: true,
+            last_edited_at: null,
+            background: background,
             product_details: {
                 ...productDetails,
                 size: flatLayFrontSize === 'adult' ? 'Adult Size' : 'Kid Size',
             },
-            da_elements: daElements,
-            editable: true,
-            last_edited_at: null,
-        };
+            da_elements: daElements
+        } as MergedPromptObject;
 
         // 6.4 FLAT LAY BACK — FORCE: resolution suffix at very end
         const flatLayBackPrompt = this.buildFlatLayBackPrompt(product, da, flatLayBackSize, qualitySuffix);
         const flatLayBackNegative = this.buildShotNegativePrompt('flatlay_back', product);
         const flatlay_back: MergedPromptObject = {
-            ...SHOT_CONFIGS.flatlay_back,
-            display_name: flatLayBackSize === 'adult' ? 'Flat Lay Back (Adult Size)' : 'Flat Lay Back (Kid Size)',
-            prompt: flatLayBackPrompt + resolutionSuffix,
+            visual_id: `visual_4_flatlay_back_${flatLayBackSize}`,
+            shot_type: 'flatlay_back',
+            model_type: flatLayBackSize,
+            gemini_prompt: flatLayBackPrompt + resolutionSuffix,
             negative_prompt: flatLayBackNegative,
-            background,
+            output: {
+                resolution: resolution,
+                aspect_ratio: (options as any).aspect_ratio || '4:5'
+            },
+            display_name: flatLayBackSize === 'adult' ? 'Flat Lay Back (Adult Size)' : 'Flat Lay Back (Kid Size)',
+            editable: true,
+            last_edited_at: null,
+            background: background,
             product_details: {
                 ...productDetails,
                 size: flatLayBackSize === 'adult' ? 'Adult Size' : 'Kid Size',
             },
-            da_elements: daElements,
-            editable: true,
-            last_edited_at: null,
-        };
+            da_elements: daElements
+        } as MergedPromptObject;
 
         // 6.5 CLOSE UP FRONT — FORCE: resolution suffix at very end
         const closeUpFrontPrompt = this.buildCloseUpFrontPrompt(product, da, qualitySuffix);
         // Force strict no-human negative prompt for closeups
         const closeUpFrontNegative = this.buildShotNegativePrompt('closeup_front', product) + ', face, head, hands, legs, person, human, body, street scene, walking, distance shot';
         const closeup_front: MergedPromptObject = {
-            ...SHOT_CONFIGS.closeup_front,
-            prompt: closeUpFrontPrompt + resolutionSuffix,
+            visual_id: `visual_5_closeup_front_product`,
+            shot_type: 'closeup_front',
+            model_type: 'product',
+            gemini_prompt: closeUpFrontPrompt + resolutionSuffix,
             negative_prompt: closeUpFrontNegative,
-            background,
-            product_details: productDetails,
-            da_elements: daElements,
+            output: {
+                resolution: resolution,
+                aspect_ratio: (options as any).aspect_ratio || '4:5'
+            },
+            display_name: 'Close Up Front',
             editable: true,
             last_edited_at: null,
-        };
+            background: background,
+            product_details: productDetails,
+            da_elements: daElements
+        } as MergedPromptObject;
 
         // 6.6 CLOSE UP BACK — FORCE: resolution suffix at very end
         const closeUpBackPrompt = this.buildCloseUpBackPrompt(product, da, qualitySuffix);
@@ -403,15 +435,36 @@ export class PromptBuilderService {
         }
 
         const closeup_back: MergedPromptObject = {
-            ...SHOT_CONFIGS.closeup_back,
-            prompt: closeUpBackPrompt + resolutionSuffix,
+            visual_id: `visual_6_closeup_back_product`,
+            shot_type: 'closeup_back',
+            model_type: 'product',
+            gemini_prompt: closeUpBackPrompt + resolutionSuffix,
             negative_prompt: closeUpBackNegative,
-            background,
+            output: {
+                resolution: resolution,
+                aspect_ratio: options['aspect_ratio'] || '4:5' // Default to 4:5 if not passed
+            },
+            // Legacy/Helper fields
+            camera: undefined, // Cleared to reduce noise
+            background: background,
             product_details: productDetails,
             da_elements: daElements,
             editable: true,
+            display_name: 'Close Up Back',
             last_edited_at: null,
         };
+
+        // BACKFILLING OTHER OBJECTS WITH NEW STRUCTURE
+        // DUO
+        // The `duo` object is already defined above, no need for `duo_final`
+        // SOLO
+        // The `solo` object is already defined above, no need for `solo_final`
+        // FLAT LAY FRONT
+        // The `flatlay_front` object is already defined above, no need for `flatlay_front_final`
+        // FLAT LAY BACK
+        // The `flatlay_back` object is already defined above, no need for `flatlay_back_final`
+        // CLOSE UP FRONT
+        // The `closeup_front` object is already defined above, no need for `closeup_front_final`
 
         return {
             visual_id: visualId,
@@ -711,10 +764,20 @@ export class PromptBuilderService {
         zipperText: string,
         qualitySuffix: string
     ): string {
-        return `Photorealistic editorial fashion photography. Medium Shot of Father and Son standing together in a ${da.mood} moment. ` +
-            `Both wearing matching ${baseAttire}. ${styling}. ${scene}. ` +
-            `${product.design_front.description}.${zipperText} ` +
-            `Real human skin texture, natural poses, editorial quality.${qualitySuffix}`;
+        // Priority 1: Client Data (Product & Specs)
+        const productData = `Product: ${product.general_info.product_name}. Color: ${product.visual_specs.color_name}. Fabric: ${product.visual_specs.fabric_texture}. ` +
+            `${product.design_front.description}. ${zipperText}`;
+
+        // Priority 2: Subject/Shot
+        const shotAction = `Medium Shot of Father and Son standing together in a ${da.mood} moment. Both wearing the target product (${baseAttire}).`;
+
+        // Priority 3: DA/Background
+        const context = `${styling}. ${scene}.`;
+
+        // Priority 4: Helpers
+        const helpers = `Photorealistic editorial fashion photography. Real human skin texture, natural poses. ${qualitySuffix}`;
+
+        return `${productData} ${shotAction} ${context} ${helpers}`;
     }
 
     private buildSoloPrompt(
@@ -735,10 +798,20 @@ export class PromptBuilderService {
             subject = 'Cute young boy, age 5-7, child model, standing naturally, playful natural pose';
         }
 
-        return `Photorealistic editorial fashion photography. Medium Shot. Single isolated portrait of ${subject}. ` +
-            `${baseAttire}. ${product.design_front.description}. ${logoTextFront}. ` +
-            `${styling}. ${scene}.${zipperText} ` +
-            `Real human skin texture, editorial quality.${qualitySuffix}`;
+        // Priority 1: Client Data (Product & Specs)
+        const productData = `Product: ${product.general_info.product_name}. Color: ${product.visual_specs.color_name}. Fabric: ${product.visual_specs.fabric_texture}. ` +
+            `${product.design_front.description}. ${logoTextFront}. ${zipperText}`;
+
+        // Priority 2: Subject/Shot
+        const shotAction = `Medium Shot. Single isolated portrait of ${subject}. ${baseAttire}.`;
+
+        // Priority 3: DA/Background
+        const context = `${styling}. ${scene}.`;
+
+        // Priority 4: Helpers
+        const helpers = `Photorealistic editorial fashion photography. Real human skin texture, editorial quality. ${qualitySuffix}`;
+
+        return `${productData} ${shotAction} ${context} ${helpers}`;
     }
 
     /**
@@ -770,12 +843,17 @@ export class PromptBuilderService {
         );
         const texturePhrase = textureReinforcement ? `, ${textureReinforcement}` : '';
 
-        return `Professional overhead flat lay photography of ${weightedColor} ${product.general_info.product_name}. ` +
-            `${sizeDescription}. ` +
-            `${product.design_front.description}. ${logoTextFront}. ` +
-            `Fabric: ${product.visual_specs.fabric_texture}${texturePhrase}. ` +
-            `Laid flat on ${da.floor.type} surface. ` +
-            `NO PEOPLE, NO HANDS, PERFECTLY FOLDED, pristine condition.${qualitySuffix}`;
+        // Priority 1: Client Data
+        const productData = `Product: ${weightedColor} ${product.general_info.product_name}. Fabric: ${product.visual_specs.fabric_texture}${texturePhrase}. ` +
+            `${product.design_front.description}. ${logoTextFront}.`;
+
+        // Priority 2: Shot
+        const shotAction = `Professional overhead flat lay photography. ${sizeDescription}. Laid flat on ${da.floor.type} surface.`;
+
+        // Priority 4: Helpers
+        const helpers = `NO PEOPLE, NO HANDS, PERFECTLY FOLDED, pristine condition. ${qualitySuffix}`;
+
+        return `${productData} ${shotAction} ${helpers}`;
     }
 
     /**
@@ -803,21 +881,27 @@ export class PromptBuilderService {
             ? 'Adult-size garment with standard adult proportions'
             : 'Child-size garment with smaller, compact proportions';
 
-        // 🎨 COLOR WEIGHTING: Apply high weight (1.5) to color for product-only shots
+        // 🎨 COLOR WEIGHTING (1.5)
         const weightedColor = this.applyColorWeighting(product.visual_specs.color_name, 'flatlay_back');
 
-        // 🎨 TEXTURE REINFORCEMENT: Ensure correct material appearance
+        // 🎨 TEXTURE REINFORCEMENT
         const textureReinforcement = this.getTextureReinforcement(
             product.visual_specs.fabric_texture,
             product.visual_specs.fabric_texture
         );
         const texturePhrase = textureReinforcement ? `, ${textureReinforcement}` : '';
 
-        return `Professional overhead flat lay photography of the BACK of ${weightedColor} ${product.general_info.product_name}. ` +
-            `${sizeDescription}. ` +
-            `${product.design_back.description}. ${patchDetail}${technique}` +
-            `Fabric: ${product.visual_specs.fabric_texture}${texturePhrase}. ` +
-            `Showing rear details clearly. NO PEOPLE, NO HANDS.${qualitySuffix}`;
+        // Priority 1: Client Data
+        const productData = `Product: BACK of ${weightedColor} ${product.general_info.product_name}. Fabric: ${product.visual_specs.fabric_texture}${texturePhrase}. ` +
+            `${product.design_back.description}. ${patchDetail}${technique}`;
+
+        // Priority 2: Shot
+        const shotAction = `Professional overhead flat lay photography. ${sizeDescription}. showing rear details clearly.`;
+
+        // Priority 4: Helpers
+        const helpers = `NO PEOPLE, NO HANDS. ${qualitySuffix}`;
+
+        return `${productData} ${shotAction} ${helpers}`;
     }
 
     /**
@@ -835,14 +919,20 @@ export class PromptBuilderService {
             ? `, hardware: ${product.garment_details.hardware_finish}`
             : '';
 
-        // 🎨 COLOR WEIGHTING: Apply high weight (1.5) to color for product-only shots
+        // 🎨 COLOR WEIGHTING
         const weightedColor = this.applyColorWeighting(product.visual_specs.color_name, 'closeup_front');
 
-        return `Macro extreme close-up detail shot of texture of ${weightedColor} ${product.general_info.product_name}. ` +
-            `Focus on fabric weave and stitching details. ` +
-            `${product.design_front.description}.${hardwareText} ` +
-            `Fabric: ${product.visual_specs.fabric_texture}. ` +
-            `NO PEOPLE, NO HANDS, MACRO LENS.${qualitySuffix}`;
+        // Priority 1: Client Data
+        const productData = `Product: ${weightedColor} ${product.general_info.product_name}. Fabric: ${product.visual_specs.fabric_texture}. ` +
+            `${product.design_front.description}.${hardwareText}`;
+
+        // Priority 2: Shot
+        const shotAction = `Macro extreme close-up detail shot of texture. Focus on fabric weave and stitching details.`;
+
+        // Priority 4: Helpers
+        const helpers = `NO PEOPLE, NO HANDS, MACRO LENS. ${qualitySuffix}`;
+
+        return `${productData} ${shotAction} ${helpers}`;
     }
 
 
@@ -863,10 +953,10 @@ export class PromptBuilderService {
             : '';
         const patchDetail = product.design_back.patch_detail || 'rear branding';
 
-        // 🎨 COLOR WEIGHTING: Apply high weight (1.5) to color for product-only shots
+        // 🎨 COLOR WEIGHTING
         const weightedColor = this.applyColorWeighting(product.visual_specs.color_name, 'closeup_back');
 
-        // 🎨 TEXTURE REINFORCEMENT: Ensure correct material appearance
+        // 🎨 TEXTURE REINFORCEMENT
         const textureReinforcement = this.getTextureReinforcement(
             product.visual_specs.fabric_texture,
             product.visual_specs.fabric_texture
@@ -885,8 +975,15 @@ export class PromptBuilderService {
 
         const focusPhrase = geometryPhrase ? `${geometryPhrase}${patchDetail}` : `Focus on ${patchDetail}`;
 
-        return `Macro detail shot of ${weightedColor} rear brand patch. ` +
-            `${focusPhrase}${techniqueText}${texturePhrase}. ` +
-            `Emphasizing craftsmanship and quality.${qualitySuffix}`;
+        // Priority 1: Client Data
+        const productData = `Product: ${weightedColor} rear brand patch. Fabric: ${product.visual_specs.fabric_texture}${texturePhrase}. ${techniqueText}.`;
+
+        // Priority 2: Shot
+        const shotAction = `Macro detail shot. ${focusPhrase}.`;
+
+        // Priority 4: Helpers
+        const helpers = `Emphasizing craftsmanship and quality. ${qualitySuffix}`;
+
+        return `${productData} ${shotAction} ${helpers}`;
     }
 }

@@ -290,7 +290,8 @@ export class GenerationsService {
 					const visual = {
 						type: promptType,
 						display_name: promptObject.display_name,
-						prompt,
+						gemini_prompt: prompt,
+						prompt, // Legacy support if frontend needs it temporarily
 						negative_prompt: promptObject.negative_prompt,
 						camera: promptObject.camera,
 						status: 'completed',
@@ -619,12 +620,12 @@ export class GenerationsService {
 			for (const shotType of selectedShots) {
 				const promptObject = mergedPrompts[shotType as keyof MergedPrompts];
 
-				if (!promptObject || !promptObject.prompt) {
+				if (!promptObject || !promptObject.gemini_prompt) {
 					this.logger.warn(`⚠️ No prompt found for shot type: ${shotType}`);
 					continue;
 				}
 
-				const prompt = promptObject.prompt;
+				const prompt = promptObject.gemini_prompt;
 				const visualIndex = allShotTypes.indexOf(shotType);
 
 				this.logger.log(`🎨 Generating ${completedCount + 1}/${totalShots}: ${shotType} (${promptObject.display_name})`);
