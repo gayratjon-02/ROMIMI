@@ -921,13 +921,16 @@ export class GenerationsService {
 		}
 
 		// Use PromptBuilderService for strict deterministic templates
-		// Now supports both legacy model_type and new shot_options
+		// CRITICAL: Pass resolution from generation so 4K/2K keywords are appended to prompts
+		const resolution = generation.resolution || '4K';
+		this.logger.log(`📐 Merge using resolution=${resolution} for prompt quality suffix`);
 		const generatedPrompts = this.promptBuilderService.buildPrompts({
 			product: productJSON as AnalyzeProductDirectResponse,
 			da: convertedDA,
 			options: {
 				model_type: input?.model_type || 'adult',
 				shot_options: input?.shot_options,
+				resolution,
 			}
 		});
 

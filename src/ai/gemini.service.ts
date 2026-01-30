@@ -36,11 +36,11 @@ export class GeminiService {
 	// ⏱️ Timeout: 3 daqiqa (180 sekund) - image generation can take longer
 	private readonly TIMEOUT_MS = 180 * 1000; // 3 minutes in milliseconds
 
-	/** DTO aspect ratio -> Gemini API accepted aspect ratio (4:5 not supported by model -> 3:4) */
+	/** DTO aspect_ratio -> Gemini generationConfig (1:1, 9:16, 4:5, 16:9) */
 	private static readonly ASPECT_RATIO_MAP: Record<string, string> = {
 		'1:1': '1:1',
-		'9:16': '9:16',
-		'4:5': '3:4',  // Gemini does not support 4:5; use 3:4 portrait
+		'9:16': '9:16',  // Portrait/Story
+		'4:5': '4:5',
 		'16:9': '16:9',
 		'3:4': '3:4',
 		'4:3': '4:3',
@@ -52,13 +52,12 @@ export class GeminiService {
 	constructor(private readonly configService: ConfigService) { }
 
 	/**
-	 * Map DTO aspect_ratio to Gemini API accepted value.
-	 * 4:5 is not supported by Gemini -> fallback to 3:4.
+	 * Map DTO aspect_ratio to Gemini API config (1:1, 9:16, 4:5, 16:9).
 	 */
 	private mapAspectRatioToGemini(dtoRatio?: string): string {
-		if (!dtoRatio || typeof dtoRatio !== 'string') return '1:1';
+		if (!dtoRatio || typeof dtoRatio !== 'string') return '4:5';
 		const normalized = dtoRatio.trim();
-		return GeminiService.ASPECT_RATIO_MAP[normalized] ?? '1:1';
+		return GeminiService.ASPECT_RATIO_MAP[normalized] ?? '4:5';
 	}
 
 	/**
@@ -123,6 +122,12 @@ High quality studio lighting, sharp details, clean background.`;
 		this.logger.log(`📝 Enhanced prompt (first 300 chars): ${enhancedPrompt.substring(0, 300)}...`);
 
 		try {
+			const imageConfig = {
+				aspectRatio: ratioText,
+				imageSize: resolutionText,
+			};
+			this.logger.log(`📐 Final Gemini generation config: ${JSON.stringify(imageConfig)}`);
+
 			// 🚀 CRITICAL: Use EXACT format from Google's official documentation
 			// Reference: https://ai.google.dev/gemini-api/docs/image-generation
 			const generatePromise = client.models.generateContent({
@@ -130,10 +135,7 @@ High quality studio lighting, sharp details, clean background.`;
 				contents: enhancedPrompt, // Can be string directly
 				config: {
 					responseModalities: ['TEXT', 'IMAGE'], // CRITICAL: Force image generation
-					imageConfig: {
-						aspectRatio: ratioText,   // Mapped: 4:5 -> 3:4, etc.
-						imageSize: resolutionText, // 1K, 2K, 4K
-					}
+					imageConfig,
 				}
 			});
 

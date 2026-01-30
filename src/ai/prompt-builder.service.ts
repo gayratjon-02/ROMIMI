@@ -211,11 +211,14 @@ export class PromptBuilderService {
         const isProductBottom = this.isBottomGarment(product.general_info.category);
 
         // ═══════════════════════════════════════════════════════════
-        // 3. COMMON PROMPT FRAGMENTS (resolution-based quality suffix)
+        // 3. COMMON PROMPT FRAGMENTS (quality = lighting only; resolution appended at END)
+        // Resolution keywords are force-appended at the very end of each prompt (see step 6).
         // ═══════════════════════════════════════════════════════════
 
-        const resolutionSuffix = this.getResolutionQualitySuffix(options.resolution);
-        const qualitySuffix = `, ${da.quality}, ${da.lighting.type}, ${da.lighting.temperature}${resolutionSuffix}`;
+        const resolution = (options.resolution && String(options.resolution).trim().toUpperCase()) || '4K';
+        const resolutionSuffix = this.getResolutionQualitySuffix(resolution);
+        this.logger.log(`📐 Resolution for prompts: "${resolution}" → force-append suffix (${resolutionSuffix.length} chars)`);
+        const qualitySuffix = `, ${da.quality}, ${da.lighting.type}, ${da.lighting.temperature}`;
         const baseAttire = `Wearing ${product.visual_specs.color_name} ${product.general_info.product_name}`;
 
         // SMART STYLING: If product IS a bottom → only footwear, no DA pants
@@ -266,11 +269,11 @@ export class PromptBuilderService {
         // 6. GENERATE 6 SHOT PROMPTS (MergedPromptObject format)
         // ═══════════════════════════════════════════════════════════
 
-        // 6.1 DUO (Father + Son)
+        // 6.1 DUO (Father + Son) — FORCE: resolution suffix at very end of prompt
         const duoPrompt = this.buildDuoPrompt(product, da, baseAttire, styling, scene, zipperText, qualitySuffix);
         const duo: MergedPromptObject = {
             ...SHOT_CONFIGS.duo,
-            prompt: duoPrompt,
+            prompt: duoPrompt + resolutionSuffix,
             negative_prompt: negativePrompt,
             background,
             product_details: productDetails,
@@ -297,11 +300,20 @@ export class PromptBuilderService {
 
         // 6.2 SOLO (uses soloSubject - can be different from flat lay)
         const soloPrompt = this.buildSoloPrompt(product, da, soloSubject, baseAttire, styling, scene, zipperText, logoTextFront, qualitySuffix);
+
+        // 🚀 STRICT NEGATIVE PROMPTING FOR SOLO
+        let soloNegative = negativePrompt;
+        if (soloSubject === 'kid') {
+            soloNegative += ', beard, stubble, mustache, facial hair, adult, mature man, wrinkles, tall, muscular';
+        } else {
+            soloNegative += ', child, kid, toddler, baby, small size';
+        }
+
         const solo: MergedPromptObject = {
             ...SHOT_CONFIGS.solo,
             display_name: soloSubject === 'adult' ? 'SOLO Adult Model' : 'SOLO Kid Model',
-            prompt: soloPrompt,
-            negative_prompt: negativePrompt,
+            prompt: soloPrompt + resolutionSuffix,
+            negative_prompt: soloNegative, // Use specific negative prompt
             background,
             product_details: productDetails,
             da_elements: daElements,
@@ -309,13 +321,13 @@ export class PromptBuilderService {
             last_edited_at: null,
         };
 
-        // 6.3 FLAT LAY FRONT (uses flatLayFrontSize - independent from solo and flat lay back)
+        // 6.3 FLAT LAY FRONT — FORCE: resolution suffix at very end
         const flatLayFrontPrompt = this.buildFlatLayFrontPrompt(product, da, flatLayFrontSize, logoTextFront, qualitySuffix);
         const flatLayFrontNegative = this.buildShotNegativePrompt('flatlay_front', product);
         const flatlay_front: MergedPromptObject = {
             ...SHOT_CONFIGS.flatlay_front,
             display_name: flatLayFrontSize === 'adult' ? 'Flat Lay Front (Adult Size)' : 'Flat Lay Front (Kid Size)',
-            prompt: flatLayFrontPrompt,
+            prompt: flatLayFrontPrompt + resolutionSuffix,
             negative_prompt: flatLayFrontNegative,
             background,
             product_details: {
@@ -327,13 +339,13 @@ export class PromptBuilderService {
             last_edited_at: null,
         };
 
-        // 6.4 FLAT LAY BACK (uses flatLayBackSize - can be different from front)
+        // 6.4 FLAT LAY BACK — FORCE: resolution suffix at very end
         const flatLayBackPrompt = this.buildFlatLayBackPrompt(product, da, flatLayBackSize, qualitySuffix);
         const flatLayBackNegative = this.buildShotNegativePrompt('flatlay_back', product);
         const flatlay_back: MergedPromptObject = {
             ...SHOT_CONFIGS.flatlay_back,
             display_name: flatLayBackSize === 'adult' ? 'Flat Lay Back (Adult Size)' : 'Flat Lay Back (Kid Size)',
-            prompt: flatLayBackPrompt,
+            prompt: flatLayBackPrompt + resolutionSuffix,
             negative_prompt: flatLayBackNegative,
             background,
             product_details: {
@@ -345,12 +357,13 @@ export class PromptBuilderService {
             last_edited_at: null,
         };
 
-        // 6.5 CLOSE UP FRONT (with shot-specific negative prompt)
+        // 6.5 CLOSE UP FRONT — FORCE: resolution suffix at very end
         const closeUpFrontPrompt = this.buildCloseUpFrontPrompt(product, da, qualitySuffix);
-        const closeUpFrontNegative = this.buildShotNegativePrompt('closeup_front', product);
+        // Force strict no-human negative prompt for closeups
+        const closeUpFrontNegative = this.buildShotNegativePrompt('closeup_front', product) + ', face, head, hands, legs, person, human, body, street scene, walking, distance shot';
         const closeup_front: MergedPromptObject = {
             ...SHOT_CONFIGS.closeup_front,
-            prompt: closeUpFrontPrompt,
+            prompt: closeUpFrontPrompt + resolutionSuffix,
             negative_prompt: closeUpFrontNegative,
             background,
             product_details: productDetails,
@@ -359,12 +372,13 @@ export class PromptBuilderService {
             last_edited_at: null,
         };
 
-        // 6.6 CLOSE UP BACK (with shot-specific negative prompt)
+        // 6.6 CLOSE UP BACK — FORCE: resolution suffix at very end
         const closeUpBackPrompt = this.buildCloseUpBackPrompt(product, da, qualitySuffix);
-        const closeUpBackNegative = this.buildShotNegativePrompt('closeup_back', product);
+        // Force strict no-human negative prompt for closeups
+        const closeUpBackNegative = this.buildShotNegativePrompt('closeup_back', product) + ', face, head, hands, legs, person, human, body, street scene, walking, distance shot';
         const closeup_back: MergedPromptObject = {
             ...SHOT_CONFIGS.closeup_back,
-            prompt: closeUpBackPrompt,
+            prompt: closeUpBackPrompt + resolutionSuffix,
             negative_prompt: closeUpBackNegative,
             background,
             product_details: productDetails,
@@ -454,20 +468,15 @@ export class PromptBuilderService {
     }
 
     /**
-     * Resolution-based quality suffix for positive_prompt (High Fidelity keywords).
-     * Do NOT put aspect ratio in the text prompt; ratio is passed only to Gemini config.
-     * 4K -> high-fidelity keywords; 2K/default -> standard quality tags.
+     * Resolution-based quality suffix — force-appended at the very end of each prompt.
+     * 4K -> high-fidelity; else -> standard. Do NOT put aspect ratio in prompt text.
      */
     private getResolutionQualitySuffix(resolution?: string): string {
-        if (!resolution || typeof resolution !== 'string') return '';
-        const r = resolution.trim().toUpperCase();
+        const r = (resolution && String(resolution).trim().toUpperCase()) || '4K';
         if (r === '4K') {
-            return ', 8k resolution, ultra-sharp focus, highly detailed texture, wallpaper quality, professional editorial photography, hasselblad x2d quality';
+            return ', 8k resolution, ultra-sharp focus, highly detailed texture, wallpaper quality, hasselblad x2d photography';
         }
-        if (r === '2K') {
-            return ', high quality, sharp focus, professional photo';
-        }
-        return '';
+        return ', high quality, professional photography';
     }
 
     /**
@@ -687,9 +696,9 @@ export class PromptBuilderService {
     ): string {
         let subject = '';
         if (modelType === 'adult') {
-            subject = 'Handsome 30s male model, Mediterranean features, natural confident pose';
+            subject = 'Handsome male model, 30s, natural confident pose';
         } else {
-            subject = 'Cute young boy (age 5-7), playful natural pose';
+            subject = 'Cute young boy, age 5-7, child model, standing naturally, playful natural pose';
         }
 
         return `Photorealistic editorial fashion photography. ${subject}. ` +
@@ -795,17 +804,14 @@ export class PromptBuilderService {
         // 🎨 COLOR WEIGHTING: Apply high weight (1.5) to color for product-only shots
         const weightedColor = this.applyColorWeighting(product.visual_specs.color_name, 'closeup_front');
 
-        // 🎨 TEXTURE REINFORCEMENT: Ensure correct material appearance
-        const textureReinforcement = this.getTextureReinforcement(
-            product.visual_specs.fabric_texture,
-            product.visual_specs.fabric_texture
-        );
-        const texturePhrase = textureReinforcement ? `. ${textureReinforcement}` : '';
-
-        return `Macro detail shot of ${weightedColor} ${product.visual_specs.fabric_texture}. ` +
-            `Focus on ${product.design_front.logo_type}${hardwareText}${texturePhrase}. ` +
-            `Hard side lighting to emphasize texture and details.${qualitySuffix}`;
+        return `Macro extreme close-up detail shot of texture of ${weightedColor} ${product.general_info.product_name}. ` +
+            `Focus on fabric weave and stitching details. ` +
+            `${product.design_front.description}.${hardwareText} ` +
+            `Fabric: ${product.visual_specs.fabric_texture}. ` +
+            `NO PEOPLE, NO HANDS, MACRO LENS.${qualitySuffix}`;
     }
+
+
 
     /**
      * CLOSE UP BACK with Color Weighting
