@@ -845,7 +845,7 @@ export class GenerationsService {
 			},
 			styling: {
 				pants: daJSON.styling?.bottom || 'Black chino pants',
-				footwear: daJSON.styling?.feet || 'BAREFOOT',
+				footwear: daJSON.styling?.feet || 'Clean white premium leather sneakers',
 			},
 			lighting: {
 				type: daJSON.lighting?.type || 'softbox',

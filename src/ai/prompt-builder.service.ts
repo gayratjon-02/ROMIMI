@@ -185,8 +185,8 @@ export class PromptBuilderService {
         // 2. BRAND GUARDIAN RULES
         // ═══════════════════════════════════════════════════════════
 
-        // FOOTWEAR RULE: Indoor scenes = BAREFOOT
-        const footwear = this.applyFootwearRule(da.styling.footwear, da.background.type);
+        // 🆕 SMART FOOTWEAR: Match footwear to product category (no more barefoot forcing)
+        const footwear = this.applySmartFootwearMatching(da.styling.footwear, product.general_info.category);
 
         // PANTS RULE: Default to Black chino pants if not specified
         const pants = this.applyPantsRule(da.styling.pants);
@@ -359,27 +359,53 @@ export class PromptBuilderService {
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * FOOTWEAR RULE: Indoor scenes = BAREFOOT
-     * Only allow shoes for outdoor street scenes
+     * 🆕 SMART FOOTWEAR MATCHING
+     * 
+     * Assigns stylish footwear based on product category instead of forcing barefoot.
+     * Models should always wear appropriate shoes matching the outfit style.
+     * 
+     * @param daFootwear - Footwear from DA preset (may be null/empty)
+     * @param productCategory - Product category (e.g., 'Joggers', 'Jacket')
+     * @returns Appropriate footwear string
      */
-    private applyFootwearRule(footwear: string, backgroundType: string): string {
-        const background = backgroundType.toLowerCase();
+    private applySmartFootwearMatching(daFootwear: string, productCategory: string): string {
+        const category = (productCategory || '').toLowerCase();
+        const existingFootwear = (daFootwear || '').toLowerCase().trim();
 
-        // Check if outdoor street scene
-        const isOutdoorStreet =
-            background.includes('street') ||
-            background.includes('sidewalk') ||
-            background.includes('pavement') ||
-            background.includes('outdoor') ||
-            background.includes('urban');
-
-        // If NOT outdoor street, force BAREFOOT
-        if (!isOutdoorStreet) {
-            this.logger.log(`👟 Footwear Rule: Indoor scene detected → forcing BAREFOOT`);
-            return 'BAREFOOT';
+        // If DA has specific footwear (not barefoot or empty), use it
+        if (existingFootwear && existingFootwear !== 'barefoot' && existingFootwear !== '') {
+            this.logger.log(`👟 Smart Footwear: Using DA footwear → "${daFootwear}"`);
+            return daFootwear;
         }
 
-        return footwear || 'casual sneakers';
+        // 🏃 SPORTY/ATHLETIC Categories → Clean white sneakers
+        const sportyKeywords = ['sweatpant', 'jogger', 'tracksuit', 'track pant', 'athletic', 'sport', 'hoodie'];
+        if (sportyKeywords.some(keyword => category.includes(keyword))) {
+            const footwear = 'Clean white premium leather sneakers';
+            this.logger.log(`👟 Smart Footwear: Sporty category "${productCategory}" → "${footwear}"`);
+            return footwear;
+        }
+
+        // 🧥 OUTERWEAR/FORMAL Categories → Stylish boots
+        const outerwearKeywords = ['jacket', 'coat', 'outerwear', 'blazer', 'parka', 'bomber', 'trucker', 'leather'];
+        if (outerwearKeywords.some(keyword => category.includes(keyword))) {
+            const footwear = 'Stylish leather Chelsea boots in matching tones';
+            this.logger.log(`👟 Smart Footwear: Outerwear category "${productCategory}" → "${footwear}"`);
+            return footwear;
+        }
+
+        // 👖 CASUAL PANTS Categories → Casual sneakers
+        const casualPantsKeywords = ['chino', 'trouser', 'pant', 'jean', 'denim'];
+        if (casualPantsKeywords.some(keyword => category.includes(keyword))) {
+            const footwear = 'Minimalist white leather sneakers';
+            this.logger.log(`👟 Smart Footwear: Casual pants "${productCategory}" → "${footwear}"`);
+            return footwear;
+        }
+
+        // 👕 DEFAULT: Fashionable footwear for any other category
+        const defaultFootwear = 'Fashionable footwear matching the outfit style';
+        this.logger.log(`👟 Smart Footwear: Default for "${productCategory}" → "${defaultFootwear}"`);
+        return defaultFootwear;
     }
 
     /**

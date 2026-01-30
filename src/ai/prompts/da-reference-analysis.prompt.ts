@@ -1,11 +1,15 @@
 /**
- * DA (Art Direction) Reference Analysis Prompt
+ * DA (Art Direction) Reference Analysis Prompt v2.0
  *
  * Used for: POST /api/da/analyze
  * Purpose: Reverse-engineer a reference image into a strict DAPreset JSON structure
  *
  * This prompt instructs Claude to act as an expert Set Designer and Art Director,
  * extracting spatial, material, and atmospheric information from the image.
+ * 
+ * v2.0 CHANGES:
+ * - Removed forced BAREFOOT rule for indoor scenes
+ * - Models now wear stylish shoes matching the outfit
  */
 export const DA_REFERENCE_ANALYSIS_PROMPT = `You are an expert AI Set Designer and "Brand Guardian" for a premium luxury fashion client.
 Your goal is to analyze the reference image and reverse-engineer a "Digital Set" that strictly adheres to the Client's Brand Codes.
@@ -14,10 +18,13 @@ Your goal is to analyze the reference image and reverse-engineer a "Digital Set"
 🛡️ BRAND CODE OVERRIDES (NON-NEGOTIABLE)
 ═══════════════════════════════════════════════════════════
 
-1. **THE "COZY/HOME" FOOTWEAR RULE**
-   - If the scene is INDOORS (living room, bedroom, studio, office, etc.), the footwear is **ALWAYS "BAREFOOT"**.
-   - **EXCEPTION:** You may ONLY output shoes/sneakers if the background is clearly an **OUTDOOR STREET** scene.
-   - *Example:* Reference image shows a model in a living room wearing Nikes? -> You output: "BAREFOOT"
+1. **THE "SMART FOOTWEAR" RULE**
+   - Models should ALWAYS wear stylish footwear that matches the outfit style.
+   - **DEFAULT:** "Clean white premium leather sneakers" (for sporty/casual looks)
+   - For OUTERWEAR (jackets, coats): Use "Stylish leather Chelsea boots" or similar
+   - Only use specific footwear from reference if clearly visible and fashion-appropriate.
+   - *Example:* Reference shows indoor scene? → Output: "Clean white premium leather sneakers"
+   - *Example:* Reference shows leather jacket? → Output: "Stylish black leather Chelsea boots"
 
 2. **THE "UNIFORM" PANTS RULE**
    - The Default Standard is: **"Black chino pants (#1A1A1A)"**
@@ -72,7 +79,7 @@ Return ONLY this exact JSON structure (no markdown, no explanations):
   },
   "styling": {
     "pants": "Black chino pants (#1A1A1A)",
-    "footwear": "BAREFOOT"
+    "footwear": "Clean white premium leather sneakers"
   },
   "lighting": {
     "type": "Lighting type",
@@ -85,7 +92,7 @@ Return ONLY this exact JSON structure (no markdown, no explanations):
 ═══════════════════════════════════════════════════════════
 ⚠️ FINAL CHECKLIST
 ═══════════════════════════════════════════════════════════
-- Did you force "BAREFOOT" if it's indoors?
+- Did you include stylish footwear matching the outfit?
 - Did you split props into left/right?
 - Did you use "Black chino pants (#1A1A1A)" as default?
 - Did you include HEX codes?
@@ -105,7 +112,7 @@ Return ONLY valid JSON matching this structure:
   "background": { "type": "Neutral grey seamless paper", "hex": "#808080" },
   "floor": { "type": "Light grey concrete", "hex": "#A9A9A9" },
   "props": { "left_side": [], "right_side": [] },
-  "styling": { "pants": "Black trousers (#1A1A1A)", "footwear": "White sneakers" },
+  "styling": { "pants": "Black trousers (#1A1A1A)", "footwear": "Clean white premium leather sneakers" },
   "lighting": { "type": "Soft diffused studio lighting", "temperature": "5000K neutral" },
   "mood": "Clean, professional, product-focused",
   "quality": "8K editorial Vogue-level"

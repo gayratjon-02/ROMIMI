@@ -84,7 +84,7 @@ export class DAService {
 	 * 
 	 * RULES:
 	 * 1. Props MUST have left_side/right_side arrays (delete items/placement/style)
-	 * 2. Indoor scenes ALWAYS force BAREFOOT (override all footwear keys)
+	 * 2. 🆕 Smart Footwear: Preserve DA footwear or apply stylish default (no more forced barefoot)
 	 * 3. Default pants to brand standard if missing
 	 */
 	private applyBrandRules(daJson: AnalyzeDAPresetResponse): AnalyzeDAPresetResponse {
@@ -119,33 +119,28 @@ export class DAService {
 		delete cleanProps.style;
 
 		// ═══════════════════════════════════════════════════════════
-		// RULE 2: FORCE BAREFOOT (Indoor Scene Detection)
+		// RULE 2: SMART FOOTWEAR (No More Forced Barefoot)
 		// ═══════════════════════════════════════════════════════════
-
-		// Build context string from background, floor, and mood
-		const backgroundStr = JSON.stringify(daJson.background || {}).toLowerCase();
-		const floorStr = JSON.stringify(daJson.floor || {}).toLowerCase();
-		const moodStr = (daJson.mood || '').toLowerCase();
-		const contextStr = backgroundStr + floorStr + moodStr;
-
-		// Expanded indoor detection keywords
-		const indoorKeywords = /room|home|indoor|wall|floor|studio|bedroom|living|office|plaster|interior|apartment|wood|panel|shelf|grain|texture|parquet|laminate|tile|carpet|rug/i;
-		const isIndoor = indoorKeywords.test(contextStr);
+		// 
+		// 🆕 NEW BEHAVIOR: Models should wear stylish shoes matching the outfit
+		// Instead of forcing BAREFOOT for indoor scenes, we now:
+		// 1. Preserve footwear from DA reference if specified
+		// 2. Apply a stylish default if no footwear is specified
+		//
+		// The actual smart matching based on product category happens in PromptBuilderService
 
 		// Defensive: Ensure styling object exists
 		if (!daJson.styling) {
 			daJson.styling = { pants: '', footwear: '' };
 		}
 
-		if (isIndoor) {
-			const currentFootwear = (daJson.styling?.footwear || '').toLowerCase();
-			if (currentFootwear !== 'barefoot') {
-				this.logger.warn(`⚠️ INDOOR DETECTED: Overriding footwear "${daJson.styling.footwear}" → BAREFOOT`);
-			}
-			// FORCE BAREFOOT - overwrite ALL footwear-related keys
-			daJson.styling.footwear = 'BAREFOOT';
-			(daJson.styling as any).feet = 'BAREFOOT';
-			(daJson.styling as any).shoes = 'BAREFOOT';
+		// If footwear is missing or explicitly BAREFOOT, apply a stylish default
+		const currentFootwear = (daJson.styling?.footwear || '').toLowerCase().trim();
+		if (!currentFootwear || currentFootwear === 'barefoot' || currentFootwear === '') {
+			this.logger.log('👟 No footwear specified → Setting stylish default');
+			daJson.styling.footwear = 'Clean white premium leather sneakers';
+			(daJson.styling as any).feet = 'Clean white premium leather sneakers';
+			(daJson.styling as any).shoes = 'Clean white premium leather sneakers';
 		}
 
 		// ═══════════════════════════════════════════════════════════

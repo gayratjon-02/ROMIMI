@@ -272,27 +272,26 @@ export class CollectionsService {
 		delete cleanProps.style;
 
 		// ═══════════════════════════════════════════════════════════
-		// RULE 2: FORCE BAREFOOT (Indoor Scene Detection)
+		// RULE 2: SMART FOOTWEAR (No More Forced Barefoot)
 		// ═══════════════════════════════════════════════════════════
-		const backgroundStr = JSON.stringify(daJson.background || {}).toLowerCase();
-		const moodStr = (daJson.mood || '').toLowerCase();
-		const contextStr = backgroundStr + moodStr;
-
-		// Expanded indoor detection keywords
-		const indoorKeywords = /room|home|indoor|wall|floor|studio|bedroom|living|office|plaster|interior|apartment|wood|panel|shelf|grain|texture|parquet|laminate|tile|carpet|rug/i;
-		const isIndoor = indoorKeywords.test(contextStr);
+		// 
+		// 🆕 NEW BEHAVIOR: Models should wear stylish shoes matching the outfit
+		// Instead of forcing BAREFOOT for indoor scenes, we now:
+		// 1. Preserve footwear from DA reference if specified
+		// 2. Apply a stylish default if no footwear is specified
 
 		// Defensive: Ensure styling object exists
 		if (!daJson.styling) {
 			(daJson as any).styling = { bottom: '', feet: '' };
 		}
 
-		if (isIndoor) {
-			console.log(`⚠️ INDOOR DETECTED: Overriding footwear to BAREFOOT`);
-			// FORCE BAREFOOT - overwrite ALL footwear-related keys
-			(daJson.styling as any).feet = 'BAREFOOT';
-			(daJson.styling as any).footwear = 'BAREFOOT';
-			(daJson.styling as any).shoes = 'BAREFOOT';
+		// If footwear is missing or explicitly BAREFOOT, apply a stylish default
+		const currentFootwear = ((daJson.styling as any).feet || (daJson.styling as any).footwear || '').toLowerCase().trim();
+		if (!currentFootwear || currentFootwear === 'barefoot' || currentFootwear === '') {
+			console.log('👟 No footwear specified → Setting stylish default');
+			(daJson.styling as any).feet = 'Clean white premium leather sneakers';
+			(daJson.styling as any).footwear = 'Clean white premium leather sneakers';
+			(daJson.styling as any).shoes = 'Clean white premium leather sneakers';
 		}
 
 		// ═══════════════════════════════════════════════════════════
@@ -460,7 +459,7 @@ export class CollectionsService {
 		// Access styling - handle both old and new key names
 		const styling = daJSON.styling || {} as any;
 		const bottom = styling.bottom || styling.pants || 'Black trousers';
-		const feet = styling.feet || styling.footwear || 'BAREFOOT';
+		const feet = styling.feet || styling.footwear || 'Clean white premium leather sneakers';
 
 		return {
 			background: {
