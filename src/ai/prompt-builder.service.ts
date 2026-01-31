@@ -767,6 +767,12 @@ export class PromptBuilderService {
     // PROMPT BUILDERS (6 Shot Types)
     // ═══════════════════════════════════════════════════════════
 
+    /**
+     * DUO PROMPT - Subject-First Architecture
+     * 
+     * 🎯 CRITICAL: SUBJECT (Father + Son) must be FIRST in prompt!
+     * Gemini gives highest weight to early tokens.
+     */
     private buildDuoPrompt(
         product: AnalyzeProductDirectResponse,
         da: AnalyzeDAPresetResponse,
@@ -776,22 +782,43 @@ export class PromptBuilderService {
         zipperText: string,
         qualitySuffix: string
     ): string {
-        // Priority 1: Client Data (Product & Specs)
-        const productData = `Product: ${product.general_info.product_name}. Color: ${product.visual_specs.color_name}. Fabric: ${product.visual_specs.fabric_texture}. ` +
-            `${product.design_front.description}. ${zipperText}`;
+        // ═══════════════════════════════════════════════════════════
+        // 🎯 PRIORITY 1: SUBJECT FIRST (Most Important!)
+        // ═══════════════════════════════════════════════════════════
+        const subjectPart = 'FATHER AND SON. An adult MAN (30s, athletic build, confident) standing with his young BOY (age 5-7, cute child). Both looking at camera. Family moment.';
 
-        // Priority 2: Subject/Shot
-        const shotAction = `Medium Shot of Father and Son standing together in a ${da.mood} moment. Both wearing the target product (${baseAttire}).`;
+        // ═══════════════════════════════════════════════════════════
+        // 🎯 PRIORITY 2: APPAREL (What they're wearing)
+        // ═══════════════════════════════════════════════════════════
+        const apparelPart = `Both wearing matching ${product.visual_specs.color_name} ${product.general_info.category}. ` +
+            `Fabric: ${product.visual_specs.fabric_texture}. ${product.design_front.description}. ${zipperText}`;
 
-        // Priority 3: DA/Background
-        const context = `${styling}. ${scene}.`;
+        // ═══════════════════════════════════════════════════════════
+        // 🎯 PRIORITY 3: ENVIRONMENT (Where)
+        // ═══════════════════════════════════════════════════════════
+        const environmentPart = `${styling}. ${scene}.`;
 
-        // Priority 4: Helpers
-        const helpers = `Photorealistic editorial fashion photography. Real human skin texture, natural poses. ${qualitySuffix}`;
+        // ═══════════════════════════════════════════════════════════
+        // 🎯 PRIORITY 4: TECHNICAL (Camera/Quality)
+        // ═══════════════════════════════════════════════════════════
+        const technicalPart = `Editorial fashion photography. Medium shot. Real human skin texture, natural poses. ${qualitySuffix}`;
 
-        return `${productData} ${shotAction} ${context} ${helpers}`;
+        // 🚀 SUBJECT FIRST - This is the key fix!
+        return `${subjectPart} ${apparelPart} ${environmentPart} ${technicalPart}`;
     }
 
+    /**
+     * SOLO PROMPT - Subject-First Architecture
+     * 
+     * 🎯 CRITICAL: SUBJECT (KID/ADULT) must be FIRST in prompt!
+     * Gemini gives highest weight to early tokens.
+     * 
+     * Prompt Order:
+     * 1. SUBJECT (who) - KID or ADULT description FIRST
+     * 2. APPAREL (what) - Product wearing
+     * 3. ENVIRONMENT (where) - DA background/props
+     * 4. TECHNICAL (how) - Camera/quality
+     */
     private buildSoloPrompt(
         product: AnalyzeProductDirectResponse,
         da: AnalyzeDAPresetResponse,
@@ -803,27 +830,36 @@ export class PromptBuilderService {
         logoTextFront: string,
         qualitySuffix: string
     ): string {
-        let subject = '';
-        if (modelType === 'adult') {
-            subject = 'Handsome male model, 30s, natural confident pose';
+        // ═══════════════════════════════════════════════════════════
+        // 🎯 PRIORITY 1: SUBJECT FIRST (Most Important!)
+        // ═══════════════════════════════════════════════════════════
+        let subjectPart = '';
+        if (modelType === 'kid') {
+            // KID: Very explicit child description
+            subjectPart = 'SINGLE CHILD MODEL. A cute young BOY, age 5-7 years old, small child. NOT an adult. Playful innocent expression, childlike features.';
         } else {
-            subject = 'Cute young boy, age 5-7, child model, standing naturally, playful natural pose';
+            // ADULT: Very explicit adult description
+            subjectPart = 'SINGLE ADULT MALE MODEL. A handsome MAN in his 30s. NOT a child. Athletic build, confident gaze, light stubble beard.';
         }
 
-        // Priority 1: Client Data (Product & Specs)
-        const productData = `Product: ${product.general_info.product_name}. Color: ${product.visual_specs.color_name}. Fabric: ${product.visual_specs.fabric_texture}. ` +
-            `${product.design_front.description}. ${logoTextFront}. ${zipperText}`;
+        // ═══════════════════════════════════════════════════════════
+        // 🎯 PRIORITY 2: APPAREL (What they're wearing)
+        // ═══════════════════════════════════════════════════════════
+        const apparelPart = `Wearing ${product.visual_specs.color_name} ${product.general_info.category}. ` +
+            `Fabric: ${product.visual_specs.fabric_texture}. ${product.design_front.description}. ${logoTextFront}. ${zipperText}`;
 
-        // Priority 2: Subject/Shot
-        const shotAction = `Medium Shot. Single isolated portrait of ${subject}. ${baseAttire}.`;
+        // ═══════════════════════════════════════════════════════════
+        // 🎯 PRIORITY 3: ENVIRONMENT (Where)
+        // ═══════════════════════════════════════════════════════════
+        const environmentPart = `${styling}. ${scene}. Standing naturally.`;
 
-        // Priority 3: DA/Background
-        const context = `${styling}. ${scene}.`;
+        // ═══════════════════════════════════════════════════════════
+        // 🎯 PRIORITY 4: TECHNICAL (Camera/Quality)
+        // ═══════════════════════════════════════════════════════════
+        const technicalPart = `Editorial fashion photography. Medium shot. Real human skin texture, natural pose. ${qualitySuffix}`;
 
-        // Priority 4: Helpers
-        const helpers = `Photorealistic editorial fashion photography. Real human skin texture, editorial quality. ${qualitySuffix}`;
-
-        return `${productData} ${shotAction} ${context} ${helpers}`;
+        // 🚀 SUBJECT FIRST - This is the key fix!
+        return `${subjectPart} ${apparelPart} ${environmentPart} ${technicalPart}`;
     }
 
     /**
