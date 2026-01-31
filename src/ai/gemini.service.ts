@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
 import { AIMessage, FileMessage } from '../libs/enums';
 import { GEMINI_MODEL, VALID_IMAGE_SIZES, GeminiImageResult } from '../libs/config';
 import { AnalyzedProductJSON } from '../common/interfaces/product-json.interface';
@@ -143,6 +143,12 @@ High quality studio lighting, sharp details, clean background.`;
 				config: {
 					responseModalities: ['TEXT', 'IMAGE'], // CRITICAL: Force image generation
 					imageConfig,
+					safetySettings: [
+						{ category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+						{ category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+						{ category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+						{ category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+					]
 				}
 			});
 
@@ -384,12 +390,16 @@ High quality studio lighting, sharp details, clean background.`;
 		if (!prompt) return '';
 		const lowerPrompt = prompt.toLowerCase();
 
-		// If the prompt contains photorealistic human markers (injected by PromptBuilder
+		// If the prompt contains specific human markers (injected by PromptBuilder
 		// for duo/solo shots), SKIP aggressive sanitization to preserve human descriptions.
 		// These prompts intentionally describe real humans, not mannequins.
 		const isPhotorealisticHumanShot =
-			lowerPrompt.includes('photorealistic') &&
-			(lowerPrompt.includes('real human skin') || lowerPrompt.includes('editorial fashion photography'));
+			lowerPrompt.includes('photorealistic') ||
+			lowerPrompt.includes('real human skin') ||
+			lowerPrompt.includes('editorial fashion photography') ||
+			lowerPrompt.includes('single child model') ||
+			lowerPrompt.includes('single adult male model') ||
+			lowerPrompt.includes('father and son');
 
 		if (isPhotorealisticHumanShot) {
 			// Only strip specific demographics for PII compliance, keep everything else
