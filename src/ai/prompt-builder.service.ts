@@ -848,7 +848,7 @@ export class PromptBuilderService {
         let subjectPart = '';
         if (modelType === 'kid') {
             // KID: Very explicit child description with negative enforcement in positive prompt
-            subjectPart = 'Subject: SINGLE CHILD MODEL (BOY). Age 5-7 years old. Small kid size. (NO ADULTS). Playful innocent expression, childlike features.';
+            subjectPart = 'Subject: SINGLE CHILD MODEL (LITTLE BOY). Age 5-7 years old. Primary schooler. Small kid size. (NO ADULTS). Playful innocent expression, childlike features.';
         } else {
             // ADULT: Very explicit adult description with negative enforcement in positive prompt
             subjectPart = 'Subject: SINGLE ADULT MALE MODEL. Age 30s. Full adult size. (NO KIDS). Athletic build, confident gaze, light stubble beard.';
@@ -857,7 +857,7 @@ export class PromptBuilderService {
         // ═══════════════════════════════════════════════════════════
         // 🎯 PRIORITY 2: APPAREL (What they're wearing)
         // ═══════════════════════════════════════════════════════════
-        const apparelPart = `Wearing ${product.visual_specs.color_name} ${product.general_info.category}. ` +
+        const apparelPart = `${baseAttire}. ` +
             `Fabric: ${product.visual_specs.fabric_texture}. ${product.design_front.description}. ${logoTextFront}. ${zipperText}`;
 
         // ═══════════════════════════════════════════════════════════
