@@ -65,6 +65,22 @@ Your analysis must be extremely precise, prioritizing anatomical placement, exac
    * "Medium-sized embroidered script logo (approx. 8cm wide) on wearer's left chest"
    * "Large oversized graphic (approx. 25cm) spanning the entire back panel"
 
+3. **HAS_PATCH MANDATORY DETAILS LAW (When has_patch: true):**
+   ⚠️ MANDATORY: If has_patch is true, ALL of the following MUST be filled with precise, observable data!
+
+   | Field | Requirement | Example |
+   |-------|-------------|---------|
+   | patch_shape | Exact carrier shape (Rectangular, Oval, Square, Circular, Shield) | "Rectangular with rounded corners" |
+   | artwork_shape | Shape of content inside | "Circular monogram", "Horizontal text bar" |
+   | size | Approximate cm (width × height) | "approx. 8×6cm", "diameter ~7cm" |
+   | size_relative_pct | % of garment region | "~18% of back yoke width, ~12% of back panel height" |
+   | placement | Anatomical location with offset | "Upper back yoke, between shoulder blades, 6cm below collar seam, horizontally centered" |
+   | patch_color | Rich color + material + finish | "Matte black full-grain leather", "Deep espresso brown with debossed edges" |
+   | technique | Material + execution method | "Full-grain leather patch with debossed circular monogram" |
+   | patch_detail | Content inside (text, graphic) | "'Born to Lead' in Didot, circular RR monogram below" |
+
+   Never set has_patch: true without filling ALL of these. Never use "N/A" or generic terms for a visible patch.
+
 3. **SHAPE DEFINITION (Patch vs. Logo):**
    ⚠️ CRITICAL: Distinguish the CARRIER MATERIAL shape from the ARTWORK inside!
 
@@ -240,16 +256,16 @@ Return ONLY valid JSON. Do not include markdown formatting.
   "design_back": {
     "has_logo": true/false,
     "has_patch": true/false,
-    "patch_shape": "CARRIER shape (e.g. 'Rectangular', 'Oval', 'Square')",
-    "artwork_shape": "ARTWORK shape inside (e.g. 'Circular monogram', 'Horizontal text')",
+    "patch_shape": "REQUIRED when has_patch: CARRIER shape (e.g. 'Rectangular', 'Oval', 'Square', 'Shield')",
+    "artwork_shape": "REQUIRED when has_patch: ARTWORK shape inside (e.g. 'Circular monogram', 'Horizontal text')",
     "font_family": "When patch contains text: exact font name (e.g. 'Didot', 'Helvetica')",
     "description": "Full description with anatomical placement",
-    "technique": "e.g. 'Matte black full-grain leather patch with debossed circular monogram'",
-    "patch_color": "Rich color (e.g. 'Deep espresso brown leather')",
-    "patch_detail": "What's inside the patch",
-    "placement": "PRECISE location (e.g. 'Upper back yoke, between shoulder blades, 8cm below collar')",
-    "size": "REQUIRED: Size estimate (e.g. 'Small discrete, approx. 5x7cm')",
-    "size_relative_pct": "REQUIRED: Relative to garment (e.g. 'Occupies ~15% of back yoke width, ~10% of back panel height')",
+    "technique": "REQUIRED when has_patch: Material + method (e.g. 'Matte black full-grain leather patch with debossed circular monogram')",
+    "patch_color": "REQUIRED when has_patch: Rich color + finish (e.g. 'Deep espresso brown leather', 'Matte black')",
+    "patch_detail": "REQUIRED when has_patch: Content inside (text, graphic, e.g. 'Born to Lead', 'RR monogram')",
+    "placement": "REQUIRED when has_patch: PRECISE location (e.g. 'Upper back yoke, between shoulder blades, 6cm below collar, centered')",
+    "size": "REQUIRED when has_patch: Approx. cm (e.g. 'approx. 8×6cm', 'diameter ~7cm')",
+    "size_relative_pct": "REQUIRED when has_patch: Relative to garment (e.g. 'Occupies ~15% of back yoke width, ~10% of back panel height')",
     "micro_details": "Seam/corner analysis (e.g. 'Double-stitched yolk seam', 'Straight hemline')"
   },
   "garment_details": {
@@ -278,6 +294,8 @@ Return ONLY valid JSON. Do not include markdown formatting.
 ❌ Ignoring seam types (single vs double stitch)
 ❌ "Serif" or "Sans-serif" for font_family instead of exact font name (e.g. Didot, Helvetica)
 ❌ Missing size_relative_pct when logo/patch exists
+❌ has_patch: true with "N/A", empty, or generic patch_shape/placement/size/patch_color
+❌ Patch without exact placement (use anatomical landmarks + offset)
 
 ✅ PLACEMENT: Use anatomical landmarks (yoke, shoulder blades, chest pocket line)
 ✅ SIZE: Include approximate cm + size_relative_pct (e.g. "~12% of chest width")
@@ -286,6 +304,7 @@ Return ONLY valid JSON. Do not include markdown formatting.
 ✅ CONSTRUCTION: Ribbed cuffs = Bomber, Straight hem = Trucker
 ✅ MICRO-DETAILS: Report corner shapes, stitch types, and exact edge terminations
 ✅ FONT_FAMILY: Exact font name (Didot, Helvetica, Futura) when logo_text exists
+✅ HAS_PATCH: When true → patch_shape, artwork_shape, placement, size, size_relative_pct, patch_color, technique, patch_detail all precise
 
 ═══════════════════════════════════════════════════════════
 ⚡ EXECUTION PROTOCOL
@@ -295,7 +314,7 @@ Return ONLY valid JSON. Do not include markdown formatting.
 2. For PANTS: Apply Zipper vs Cuff Law at ankle
 3. For PANTS: Scan thighs for branding
 4. Analyze FRONT logo: placement, size, font_family (exact font name), size_relative_pct
-5. Analyze BACK patch: CARRIER shape vs ARTWORK shape, font_family if text, size_relative_pct
+5. Analyze BACK patch (has_patch: true → ALL required): patch_shape, artwork_shape, placement, size (cm), size_relative_pct, patch_color, technique, patch_detail
 6. Include SIZE estimates with approximate cm + size_relative_pct (garment-relative %)
 7. Use RICH color descriptions (depth + color + finish)
 8. Describe ALL hardware with precise material/finish
